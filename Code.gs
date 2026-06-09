@@ -1,5 +1,5 @@
 /**
- * @fileoverview Timetable Travelling Group Viewer — Google Apps Script backend.
+ * @fileoverview Timetable Viewer — Google Apps Script backend.
  *
  * Reads the aSc Timetables XML export from a specific Google Drive folder and
  * returns structured schedule data to the browser for interactive display.
@@ -15,7 +15,7 @@
  */
 
 /** Name of the XML file to locate in the timetable folder. */
-const XML_FILENAME = 'asctt2012.xml';
+const XML_FILENAME = 'MSSS Schedule.xml';
 
 /**
  * ID of the Shared Drive folder that holds the timetable XML.
@@ -24,10 +24,22 @@ const XML_FILENAME = 'asctt2012.xml';
 const TIMETABLE_FOLDER_ID = '1HP8gmuAjCm8AsqxRlTaS-OI2uMlK1Z54';
 
 /**
- * Grades that use the travelling-group system. Groups in these grades whose
- * names start with a digit are auto-detected as travelling group sub-divisions.
+ * Grades that use the travelling-group system. Groups whose names start with a
+ * digit are clustered by that digit into separate travelling groups.
  */
 const TRAVELLING_GROUP_GRADES = [6, 7, 8, 9];
+
+/**
+ * Grades shown as a whole-class view (no travelling group sub-division).
+ * Each class appears as a single entry; simultaneous elective splits are
+ * displayed as horizontal sub-slots, exactly as TG splits are.
+ */
+const CLASS_VIEW_GRADES = [10, 11, 12];
+
+/** Maps a 5-bit day string from the XML to a day number (1–5). */
+const DAY_FROM_BITS = {
+  '10000': 1, '01000': 2, '00100': 3, '00010': 4, '00001': 5
+};
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -50,10 +62,11 @@ function doGet() {
  * Called from the browser via google.script.run.withSuccessHandler(fn).getTimetableData().
  *
  * The returned object contains:
- *  - travellingGroups: array of group descriptors (id, label, classId, etc.)
- *  - grids: pre-built schedule data keyed by [tgId][semester][week][day][period]
+ *  - periods:         array of period descriptors with real start/end times
+ *  - travellingGroups: array of group/class descriptors
+ *  - grids:           schedule data keyed by [tgId][semester][week][day][xmlPeriodNum]
  *
- * @returns {{travellingGroups: Array, grids: Object}}
+ * @returns {{periods: Array, travellingGroups: Array, grids: Object}}
  */
 function getTimetableData() {
   const doc = loadXmlFromDrive();
@@ -64,9 +77,8 @@ function getTimetableData() {
 
 /**
  * Finds and parses the timetable XML from the designated Shared Drive folder.
- * Scoping to one folder avoids any ambiguity when multiple XML exports exist
- * across Drive. If multiple copies share the filename, the most recently
- * modified is used.
+ * Scoping to one folder avoids ambiguity when multiple XML exports exist across
+ * Drive. If multiple copies share the filename, the most recently modified wins.
  *
  * @see https://developers.google.com/apps-script/reference/drive/drive-app#getFolderById(String)
  * @returns {GoogleAppsScript.XML_Service.Document}
@@ -83,7 +95,6 @@ function loadXmlFromDrive() {
       'Upload the XML export to that folder and ensure the filename matches XML_FILENAME.'
     );
   }
-  // If multiple copies exist, pick the most recently modified.
   let best = files.next();
   while (files.hasNext()) {
     const candidate = files.next();
@@ -96,15 +107,15 @@ function loadXmlFromDrive() {
 // ── Data building ─────────────────────────────────────────────────────────────
 
 /**
- * Orchestrates parsing of the XML document into the data structure
- * the frontend grid renderer expects.
+ * Orchestrates parsing of the XML document into the structure the frontend expects.
  *
  * @param {GoogleAppsScript.XML_Service.Document} doc
- * @returns {{travellingGroups: Array, grids: Object}}
+ * @returns {{periods: Array, travellingGroups: Array, grids: Object}}
  */
 function buildTimetableData(doc) {
   const root = doc.getRootElement();
 
+  const periods    = parsePeriods(root);
   const subjects   = parseSection(root, 'subjects',   'subject');
   const teachers   = parseSection(root, 'teachers',   'teacher');
   const classrooms = parseSection(root, 'classrooms', 'classroom');
@@ -114,16 +125,66 @@ function buildTimetableData(doc) {
   const cards      = parseCards(root);
 
   const travellingGroups = detectTravellingGroups(classes, allGroups);
-  const grids = buildGrids(travellingGroups, lessons, cards, subjects, teachers, classrooms, allGroups);
+  const grids = buildGrids(
+    travellingGroups, lessons, cards,
+    subjects, teachers, classrooms, allGroups, periods
+  );
 
-  return { travellingGroups, grids };
+  return { periods, travellingGroups, grids };
 }
 
 // ── Section parsers ───────────────────────────────────────────────────────────
 
 /**
- * Parses a named XML section (e.g. <subjects><subject .../></subjects>)
- * into an object keyed by each element's id attribute.
+ * Parses the <periods> section and resolves each entry to real clock times.
+ * Period names like "1." are normalised to "Period 1" for display.
+ * Times are stored as minutes from midnight so the frontend can size rows
+ * proportionally and the Phase 2 timeline can place blocks accurately.
+ *
+ * @param {GoogleAppsScript.XML_Service.Element} root
+ * @returns {Array} Sorted array of {period, label, short, startMin, endMin, durationMin}
+ */
+function parsePeriods(root) {
+  const result = [];
+  const section = root.getChild('periods');
+  if (!section) return result;
+
+  section.getChildren('period').forEach(p => {
+    const rawLabel = attrVal(p, 'name');
+    // Normalise "1." → "Period 1", "2." → "Period 2" etc.; leave named periods as-is.
+    const label = /^\d+\.$/.test(rawLabel)
+      ? 'Period ' + rawLabel.replace('.', '')
+      : rawLabel;
+
+    const startMin = timeToMinutes(attrVal(p, 'starttime'));
+    const endMin   = timeToMinutes(attrVal(p, 'endtime'));
+
+    result.push({
+      period:      parseInt(attrVal(p, 'period'), 10),
+      label,
+      short:       attrVal(p, 'short'),
+      startMin,
+      endMin,
+      durationMin: endMin - startMin
+    });
+  });
+
+  return result.sort((a, b) => a.period - b.period);
+}
+
+/**
+ * Converts a "H:MM" time string to minutes from midnight.
+ *
+ * @param {string} timeStr  e.g. "8:15" or "13:30"
+ * @returns {number}
+ */
+function timeToMinutes(timeStr) {
+  const parts = timeStr.split(':');
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
+
+/**
+ * Parses a named XML section into an object keyed by each element's id attribute.
  *
  * @param {GoogleAppsScript.XML_Service.Element} root
  * @param {string} sectionTag  e.g. 'subjects'
@@ -215,127 +276,138 @@ function parseCards(root) {
   return result;
 }
 
-// ── Travelling group detection ─────────────────────────────────────────────────
+// ── Group / class detection ───────────────────────────────────────────────────
 
 /**
- * Auto-detects travelling groups from the classes and groups data.
+ * Builds the list of selectable schedule units for the frontend dropdown.
  *
- * Rules:
- *  - Only processes grades defined in TRAVELLING_GROUP_GRADES.
- *  - "BY" classes: the whole class is treated as one travelling group.
- *  - "G" classes: groups whose names start with a digit are clustered
- *    by that first digit into separate travelling groups (one per digit).
+ * For grades 6–9 (TRAVELLING_GROUP_GRADES):
+ *   - BY classes → one entry for the whole class (viewType: 'tg')
+ *   - G classes  → one entry per leading digit in group names (viewType: 'tg')
+ *
+ * For grades 10–12 (CLASS_VIEW_GRADES):
+ *   - Each class → one entry; all its groups included (viewType: 'class')
+ *   - Simultaneous elective groups appear as horizontal splits in cells
+ *
+ * Each entry carries a `grade` integer so the frontend can group by grade
+ * without regex-parsing the label.
  *
  * @param {Object} classes   Map of classId → class attributes
  * @param {Object} allGroups Map of groupId → group data
- * @returns {Array} Array of {id, label, classId, className, classShort, groupIds, groupNames}
+ * @returns {Array} Sorted array of schedule unit descriptors
  */
 function detectTravellingGroups(classes, allGroups) {
   const result = [];
 
   Object.entries(classes).forEach(([classId, cls]) => {
     const grade = parseInt(cls.grade || '0', 10);
-    if (!TRAVELLING_GROUP_GRADES.includes(grade)) return;
 
     const classGroupEntries = Object.entries(allGroups)
       .filter(([, g]) => g.classId === classId)
       .map(([id, g]) => ({ id, ...g }));
 
-    if (cls.short.includes('BY')) {
-      // Boys class: entire class is one travelling group.
+    if (TRAVELLING_GROUP_GRADES.includes(grade)) {
+      if (cls.short.includes('BY')) {
+        result.push({
+          id:         `${cls.short}-BY`,
+          label:      `${grade}G-BY`,
+          grade,
+          classId,
+          className:  cls.name,
+          classShort: cls.short,
+          groupIds:   classGroupEntries.map(g => g.id),
+          viewType:   'tg'
+        });
+        return;
+      }
+
+      // Cluster groups by leading digit to form travelling groups.
+      const numericGroups = classGroupEntries.filter(g => /^\d/.test(g.name));
+      const byDigit = {};
+      numericGroups.forEach(g => {
+        const digit = g.name.charAt(0);
+        if (!byDigit[digit]) byDigit[digit] = [];
+        byDigit[digit].push(g);
+      });
+
+      Object.keys(byDigit).sort().forEach(digit => {
+        const groups = byDigit[digit];
+        result.push({
+          id:         `${cls.short}-${digit}`,
+          label:      `${grade}G-${digit}`,
+          grade,
+          classId,
+          className:  cls.name,
+          classShort: cls.short,
+          groupIds:   groups.map(g => g.id),
+          viewType:   'tg'
+        });
+      });
+
+    } else if (CLASS_VIEW_GRADES.includes(grade)) {
       result.push({
-        id:         `${cls.short}-BY`,
-        label:      `${grade}G-BY`,
+        id:         `${cls.short}-CLASS`,
+        label:      cls.short,
+        grade,
         classId,
         className:  cls.name,
         classShort: cls.short,
         groupIds:   classGroupEntries.map(g => g.id),
-        groupNames: classGroupEntries.map(g => g.name)
+        viewType:   'class'
       });
-      return;
     }
-
-    // G class: cluster groups by their leading digit.
-    const numericGroups = classGroupEntries.filter(g => /^\d/.test(g.name));
-    const byDigit = {};
-    numericGroups.forEach(g => {
-      const digit = g.name.charAt(0);
-      if (!byDigit[digit]) byDigit[digit] = [];
-      byDigit[digit].push(g);
-    });
-
-    Object.keys(byDigit).sort().forEach(digit => {
-      const groups = byDigit[digit];
-      result.push({
-        id:         `${cls.short}-${digit}`,
-        label:      `${grade}G-${digit}`,
-        classId,
-        className:  cls.name,
-        classShort: cls.short,
-        groupIds:   groups.map(g => g.id),
-        groupNames: groups.map(g => g.name)
-      });
-    });
   });
 
-  return result.sort((a, b) => a.label.localeCompare(b.label));
+  // Sort by grade ascending, then alphabetically within each grade.
+  return result.sort((a, b) => {
+    if (a.grade !== b.grade) return a.grade - b.grade;
+    return a.label.localeCompare(b.label);
+  });
 }
 
 // ── Grid builder ──────────────────────────────────────────────────────────────
 
 /**
- * Maps XML period numbers to 1-based display period indices.
- * Periods 3 (Lunch Pt 1) and 4 (Lunch Pt 2 / Advisory) are excluded from display.
- */
-const PERIOD_DISPLAY_MAP = { 1: 1, 2: 2, 5: 3, 6: 4 };
-
-/** Maps a 5-bit day string from the XML to a day number (1–5). */
-const DAY_FROM_BITS = {
-  '10000': 1, '01000': 2, '00100': 3, '00010': 4, '00001': 5
-};
-
-/** Display labels and time ranges for each academic period. */
-const PERIOD_INFO = {
-  1: { label: 'Period 1', time: '8:15–9:35' },
-  2: { label: 'Period 2', time: '9:45–11:05' },
-  3: { label: 'Period 3', time: '12:10–13:30' },
-  4: { label: 'Period 4', time: '13:40–15:00' }
-};
-
-/**
- * Builds pre-computed grid data for every travelling group.
+ * Builds pre-computed grid data for every schedule unit.
  *
  * Grid structure:
- *   grids[tgId][semester][week][day][period] = Array of slot objects
+ *   grids[tgId][semester][week][day][xmlPeriodNum] = Array of slot objects
  *
- * Each slot object:
- *   { subject, subjectShort, teacher, teacherShort, room, roomShort, subGroupNames }
+ * xmlPeriodNum is the raw period number from the XML (not a display index), so
+ * the frontend can look up slots using the period list from parsePeriods().
+ * All named periods are included — lunch, advisory, etc.
  *
- * A slot represents one distinct lesson in that cell. Where a travelling group
- * splits (e.g. language sub-groups), there will be multiple slots per cell,
- * displayed horizontally by the frontend.
+ * Each slot: { subject, subjectShort, teacher, room, roomShort, subGroupNames }
  *
- * Inclusion rules per cell:
- *  1. Include lessons whose groups overlap with the travelling group (TG-specific lessons).
- *  2. Include lessons whose groups contain none of any TG's numeric groups (shared lessons
- *     such as English ability groups or advisory that apply to all students).
- *  3. Exclude lessons whose groups belong only to a different travelling group.
+ * Inclusion rules:
+ *  viewType 'tg'   — include lessons whose groups overlap with this TG's groupIds
+ *                    OR whose groups contain none of any TG's numeric groups (shared
+ *                    lessons such as English ability sets or advisory).
+ *  viewType 'class' — include all lessons where the classId matches; no group filtering.
+ *                    Simultaneous elective splits appear as multiple slots per cell.
  *
- * @param {Array}  travellingGroups
+ * @param {Array}  travellingGroups  Output of detectTravellingGroups()
  * @param {Object} lessons
  * @param {Array}  cards
  * @param {Object} subjects
  * @param {Object} teachers
  * @param {Object} classrooms
  * @param {Object} allGroups
- * @returns {Object} Nested grid structure.
+ * @param {Array}  periods           Output of parsePeriods()
+ * @returns {Object} Nested grid structure
  */
-function buildGrids(travellingGroups, lessons, cards, subjects, teachers, classrooms, allGroups) {
+function buildGrids(travellingGroups, lessons, cards, subjects, teachers, classrooms, allGroups, periods) {
 
-  // Set of all group IDs that belong to any travelling group, used to identify
-  // "shared" lessons (those using no TG-specific groups, e.g. English ability groups).
-  const allTgGroupIds = new Set(travellingGroups.flatMap(tg => tg.groupIds));
+  // Only TG-mode groups feed the shared-lesson detection set.
+  // Class-view groups (grades 10–12) are excluded so their lessons aren't
+  // accidentally treated as "shared" and shown in grades 6–9 views.
+  const allTgGroupIds = new Set(
+    travellingGroups
+      .filter(tg => tg.viewType === 'tg')
+      .flatMap(tg => tg.groupIds)
+  );
 
+  const allPeriodNums = periods.map(p => p.period);
   const grids = {};
 
   travellingGroups.forEach(tg => {
@@ -350,64 +422,67 @@ function buildGrids(travellingGroups, lessons, cards, subjects, teachers, classr
         const weekBit = week === 'A' ? '10' : '01';
         grids[tg.id][semester][week] = {};
 
-        // Initialise empty cells for every day and display period.
         for (let day = 1; day <= 5; day++) {
-          grids[tg.id][semester][week][day] = { 1: [], 2: [], 3: [], 4: [] };
+          grids[tg.id][semester][week][day] = {};
+          allPeriodNums.forEach(pNum => {
+            grids[tg.id][semester][week][day][pNum] = [];
+          });
         }
 
         cards.forEach(card => {
-          // Card must fall in this week (exact match or "all weeks").
           if (card.weeks !== weekBit && card.weeks !== '11') return;
-
-          // Card must fall in this semester (exact match or "all terms").
           if (card.terms !== termBit && card.terms !== '11') return;
 
           const day = DAY_FROM_BITS[card.days];
           if (!day) return;
 
-          const displayPeriod = PERIOD_DISPLAY_MAP[card.period];
-          if (!displayPeriod) return;
+          if (!allPeriodNums.includes(card.period)) return;
 
           const lesson = lessons[card.lessonId];
           if (!lesson) return;
 
-          // Lesson must involve the TG's class (filters out cross-class lessons
-          // that don't include this class at all).
           if (!lesson.classIds.includes(tg.classId)) return;
 
-          const matchesTg = lesson.groupIds.some(gId => tgGroupSet.has(gId));
-          const isShared  = !lesson.groupIds.some(gId => allTgGroupIds.has(gId));
+          let include = false;
+          let relevantGroupIds = [];
 
-          if (!matchesTg && !isShared) return;
+          if (tg.viewType === 'class') {
+            // Grades 10–12: show all lessons for the class.
+            include = true;
+            relevantGroupIds = lesson.groupIds.filter(gId => tgGroupSet.has(gId));
+          } else {
+            // Grades 6–9: TG-specific or shared lessons only.
+            const matchesTg = lesson.groupIds.some(gId => tgGroupSet.has(gId));
+            const isShared  = !lesson.groupIds.some(gId => allTgGroupIds.has(gId));
+            include = matchesTg || isShared;
+            relevantGroupIds = matchesTg
+              ? lesson.groupIds.filter(gId => tgGroupSet.has(gId))
+              : lesson.groupIds;
+          }
 
-          // Resolve display strings.
+          if (!include) return;
+
           const subj = subjects[lesson.subjectId] || { name: 'Unknown', short: '?' };
 
-          const teacherShort = lesson.teacherIds
-            .map(id => (teachers[id] || {}).short || id).join(', ');
-          const teacherFull = lesson.teacherIds
+          const teacher = lesson.teacherIds
             .map(id => (teachers[id] || {}).name || id).join(', ');
 
-          // Cards can override the lesson's classroom assignment.
           const roomIds = card.classroomIds.length > 0
             ? card.classroomIds
             : lesson.classroomIds;
           const roomShort = roomIds.map(id => (classrooms[id] || {}).short || id).join(', ');
           const roomFull  = roomIds.map(id => (classrooms[id] || {}).name  || id).join(', ');
 
-          // For TG-specific lessons, report only the sub-groups from this TG.
-          // For shared lessons (English etc.), report the actual group name.
-          const relevantGroupIds = matchesTg
-            ? lesson.groupIds.filter(gId => tgGroupSet.has(gId))
-            : lesson.groupIds;
+          // Suppress "Entire class" — it adds no information when there's only one slot.
           const subGroupNames = relevantGroupIds
-            .map(gId => (allGroups[gId] || {}).name || gId);
+            .map(gId => allGroups[gId])
+            .filter(g => g && !g.entireClass)
+            .map(g => g.name);
 
-          grids[tg.id][semester][week][day][displayPeriod].push({
+          grids[tg.id][semester][week][day][card.period].push({
             subject:      subj.name,
             subjectShort: subj.short,
-            teacher:      teacherFull,
-            teacherShort,
+            teacher,
             room:         roomFull,
             roomShort,
             subGroupNames

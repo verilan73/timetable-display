@@ -6,7 +6,6 @@
   <base target="_top">
   <title>Timetable Viewer</title>
   <style>
-    /* ── Reset & base ──────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -30,7 +29,7 @@
     .spinner {
       width: 40px; height: 40px;
       border: 3px solid #ddd;
-      border-top-color: #4a6fa5;
+      border-top-color: #8b1a4a;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -59,12 +58,20 @@
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
-    #controls h1 {
-      font-size: 18px;
-      font-weight: 600;
-      color: #1a1a2e;
+
+    .school-logo {
+      height: 44px;
+      width: auto;
       flex-shrink: 0;
     }
+
+    .controls-divider {
+      width: 1px;
+      height: 32px;
+      background: #ccd;
+      flex-shrink: 0;
+    }
+
     .control-group {
       display: flex;
       align-items: center;
@@ -76,6 +83,7 @@
       color: #555;
       white-space: nowrap;
     }
+
     select {
       padding: 6px 10px;
       border: 1px solid #ccd;
@@ -85,9 +93,8 @@
       color: #1a1a2e;
       cursor: pointer;
     }
-    select:focus { outline: 2px solid #4a6fa5; outline-offset: 1px; }
+    select:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
 
-    /* Semester toggle */
     .toggle {
       display: flex;
       border: 1px solid #ccd;
@@ -105,20 +112,19 @@
     }
     .toggle button:not(:last-child) { border-right: 1px solid #ccd; }
     .toggle button.active {
-      background: #4a6fa5;
+      background: #8b1a4a;
       color: white;
       font-weight: 600;
     }
     .toggle button:not(.active):hover { background: #f0f2f5; }
 
-    /* ── Main content: grids + sidebar ────────────────────────────────────── */
+    /* ── Main layout ───────────────────────────────────────────────────────── */
     #main-layout {
       display: flex;
       gap: 16px;
       align-items: flex-start;
     }
 
-    /* Grids column — takes all remaining space */
     #grids {
       flex: 1 1 0;
       min-width: 0;
@@ -136,59 +142,59 @@
     .week-title {
       background: #1a1a2e;
       color: white;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       letter-spacing: 0.06em;
-      padding: 8px 14px;
+      padding: 7px 14px;
     }
 
     /* ── Timetable table ───────────────────────────────────────────────────── */
     table.timetable {
-      /* table-layout:fixed means the browser honours <col> widths and
-         divides remaining space equally across columns with no explicit width,
-         giving all five day columns identical widths */
       table-layout: fixed;
       width: 100%;
       border-collapse: collapse;
       background: white;
     }
 
-    col.col-period { width: 90px; }
-    /* col-day: no explicit width — equal share of the remainder */
+    col.col-period { width: 100px; }
+    /* col-day: equal share of remaining width */
 
-    /* Day header row */
     table.timetable thead th {
       background: #2c2c44;
       color: #aab;
       font-size: 12px;
       font-weight: 600;
       text-align: center;
-      padding: 6px 4px;
+      padding: 5px 4px;
       letter-spacing: 0.04em;
     }
-    table.timetable thead th.th-period {
-      background: #1a1a2e;
-    }
+    table.timetable thead th.th-period { background: #1a1a2e; }
 
-    /* Period label cells */
+    /* Period label — height driven by JS to achieve proportional rows */
     td.period-label {
       background: #f7f8fa;
       border-right: 2px solid #e0e2ea;
       border-bottom: 1px solid #e8eaf0;
-      padding: 8px 10px;
+      padding: 6px 10px;
       text-align: right;
-      vertical-align: middle;
+      vertical-align: top;
     }
     td.period-label .period-name {
       font-weight: 700;
-      font-size: 12px;
+      font-size: 11px;
       color: #1a1a2e;
+      white-space: nowrap;
     }
     td.period-label .period-time {
-      font-size: 10px;
-      color: #888;
+      font-size: 9px;
+      color: #999;
       margin-top: 2px;
+      white-space: nowrap;
     }
+
+    /* Lunch/advisory rows get a quieter background */
+    tr.non-teaching td.period-label { background: #f0f1f6; }
+    tr.non-teaching td.grid-cell    { background: #fafafa; }
 
     /* Data cells */
     td.grid-cell {
@@ -198,63 +204,71 @@
     }
     td.grid-cell.empty { background: #fafbfc; }
 
-    /* Slot row — horizontal flex for sub-group splits */
+    /* Horizontal flex for sub-group splits */
     .slot-row {
       display: flex;
       flex-direction: row;
       height: 100%;
-      min-height: 80px;
     }
 
-    /* Individual slot */
+    /* Individual subject slot */
     .slot {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 5px 6px;
+      padding: 4px 5px;
       border-right: 1px solid rgba(0,0,0,0.07);
       overflow: hidden;
       min-width: 0;
+      transition: opacity 0.2s, filter 0.2s;
     }
     .slot:last-child { border-right: none; }
 
     .slot-subject {
       font-weight: 700;
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.2;
-      color: rgba(0,0,0,0.82);
+      color: rgba(0,0,0,0.85);
     }
-
-    /* Full teacher name — 2-line clamp keeps cells compact */
     .slot-teacher {
-      font-size: 10px;
+      font-size: 9.5px;
       color: rgba(0,0,0,0.65);
       line-height: 1.3;
-      margin-top: 3px;
+      margin-top: 2px;
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
     }
-
     .slot-room {
-      font-size: 10px;
+      font-size: 9px;
       color: rgba(0,0,0,0.5);
-      margin-top: 2px;
+      margin-top: 1px;
+    }
+    .slot-subgroups {
+      font-size: 8.5px;
+      color: rgba(0,0,0,0.4);
+      margin-top: 3px;
+      font-style: italic;
+      line-height: 1.2;
     }
 
-    .slot-subgroups {
-      font-size: 9px;
-      color: rgba(0,0,0,0.4);
-      margin-top: 4px;
-      font-style: italic;
+    /* ── Subject filter ────────────────────────────────────────────────────── */
+    /* When a filter is active, fade non-matching slots */
+    #grids.filter-active .slot {
+      opacity: 0.1;
+      filter: saturate(0.1);
+    }
+    #grids.filter-active .slot.filter-match {
+      opacity: 1;
+      filter: none;
     }
 
     /* ── Legend sidebar ────────────────────────────────────────────────────── */
     #legend {
       flex-shrink: 0;
-      width: 168px;
+      width: 172px;
       background: white;
       border-radius: 10px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.08);
@@ -265,20 +279,33 @@
       overflow-y: auto;
     }
     #legend-title {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       color: #888;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
       margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #eee;
+    }
+    #legend-hint {
+      font-size: 9px;
+      color: #bbb;
+      margin-bottom: 8px;
+      line-height: 1.4;
     }
     .legend-item {
       display: flex;
       align-items: flex-start;
       gap: 6px;
-      margin-bottom: 6px;
-      line-height: 1.3;
+      margin-bottom: 5px;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 3px 4px;
+      transition: background 0.15s;
     }
+    .legend-item:hover { background: #f0f2f5; }
+    .legend-item.active { background: #f0f2f5; outline: 1.5px solid #1a1a2e; }
     .legend-swatch {
       width: 14px;
       height: 14px;
@@ -290,10 +317,12 @@
       font-weight: 700;
       font-size: 11px;
       color: #1a1a2e;
+      line-height: 1.2;
     }
     .legend-name {
-      font-size: 10px;
+      font-size: 9.5px;
       color: #666;
+      line-height: 1.3;
     }
   </style>
 </head>
@@ -301,17 +330,20 @@
 
   <div id="loading">
     <div class="spinner"></div>
-    <div>Loading timetable data…</div>
+    <div>Loading timetable…</div>
   </div>
 
   <div id="error"></div>
 
   <div id="app">
     <div id="controls">
-      <h1>Timetable Viewer</h1>
+      <img src="https://drive.google.com/thumbnail?id=1wPCk9ZbXWmjhRyKnFdLyxT-_B9k_N3SS"
+           alt="Branksome Hall Asia" class="school-logo">
+
+      <div class="controls-divider"></div>
 
       <div class="control-group">
-        <label for="tg-select">Travelling group</label>
+        <label for="tg-select">Group / Class</label>
         <select id="tg-select"></select>
       </div>
 
@@ -326,11 +358,11 @@
 
     <div id="main-layout">
       <div id="grids">
-        <!-- Week A and Week B blocks rendered by renderGrid() -->
+        <!-- Week A and B rendered by renderGrid() -->
       </div>
       <div id="legend">
         <div id="legend-title">Subjects</div>
-        <!-- legend items rendered by renderLegend() -->
+        <div id="legend-hint">Click to highlight</div>
       </div>
     </div>
   </div>
@@ -340,12 +372,13 @@
     let timetableData = null;
     let currentTg     = null;
     let currentSem    = 'S1';
+    let currentFilter = null;   // subject short code, or null
 
-    // ── Subject colour map ────────────────────────────────────────────────────
+    // ── Subject colours ───────────────────────────────────────────────────────
     const SUBJECT_COLOURS = {
       // Sciences
       'SCI':   '#a5d6a7', 'BIO': '#80c784', 'CHE': '#66bb6a',
-      'PHY':   '#4caf50', 'ESS': '#81c784',
+      'PHY':   '#4caf50', 'ESS': '#81c784', 'Spo': '#c8e6c9',
       // Mathematics
       'MAT':   '#90caf9', 'MATSt': '#64b5f6', 'MATEx': '#42a5f5',
       'MAA':   '#2196f3', 'MAI': '#1976d2',
@@ -354,28 +387,35 @@
       // Korean
       'KorLL': '#ff8a65', 'KorLA': '#ff7043', 'KAH': '#e64a19',
       // Chinese
-      'ChiLL': '#f48fb1', 'ChiLi': '#f06292',
-      // Other languages
-      'SSST':  '#ce93d8', 'Pam': '#ab47bc',
+      'ChiLL': '#f48fb1', 'ChiLi': '#f06292', 'Chi': '#f48fb1',
       // Humanities
       'HUM':   '#ce93d8', 'HIS': '#ba68c8', 'GEO': '#ab47bc',
       'ECO':   '#9c27b0', 'BUS': '#7b1fa2', 'PSY': '#6a1b9a',
+      'Bus':   '#7b1fa2', 'Eco': '#9c27b0', 'GeoHis': '#ba68c8',
       // Arts
       'MUS':   '#80deea', 'VIS': '#4dd0e1', 'DAN': '#26c6da',
-      'THE':   '#00acc1', 'FILM': '#00838f',
-      // PHE & sport
-      'PHE':   '#a5d6a7', 'PHEICE': '#4db6ac', 'SEH': '#80cbc4',
-      // Design
+      'THE':   '#00acc1', 'FILM': '#00838f', 'Mus': '#80deea',
+      // Design & Technology
       'DES':   '#ffcc80', 'DTEC': '#ffa726', 'PRO': '#fb8c00',
       'ROB':   '#f57c00', 'DMD': '#e65100', 'ENT': '#ffb300',
-      // Core / advisory
+      'Des':   '#ffcc80', 'Ent': '#ffb300',
+      // PHE & sport
+      'PHE':   '#b2dfdb', 'PHEICE': '#4db6ac', 'SEH': '#80cbc4',
+      // Core / advisory / pastoral
       'TOK':   '#ef9a9a', 'COR': '#e0e0e0', 'ADV': '#eeeeee',
-      'STU':   '#f5f5f5', 'Protect': '#f5f5f5', 'Collab Time': '#e8eaf6',
+      'STU':   '#f5f5f5', 'Protect': '#f5f5f5',
+      'Collab Time': '#e8eaf6', 'CT(Hrm)': '#e8eaf6',
+      // JS subjects
+      'Hrm':   '#e0e0e0', 'HRD': '#e0e0e0', 'HrmT': '#eeeeee',
+      'Kor':   '#ff8a65', 'KAL': '#ffb74d',
+      'Art':   '#4dd0e1', 'PE':  '#b2dfdb',
+      'Lib':   '#e8eaf6', 'Swi': '#b2ebf2', 'Ska': '#b3e5fc',
+      'A':     '#f5f5f5',
     };
 
     /**
      * Returns a stable background colour for a subject short code.
-     * Unknown subjects fall back to a deterministic hue from the string hash.
+     * Falls back to a hash-derived hue for unrecognised subjects.
      *
      * @param {string} short
      * @returns {string} CSS colour
@@ -386,15 +426,35 @@
       for (let i = 0; i < short.length; i++) {
         hash = short.charCodeAt(i) + ((hash << 5) - hash);
       }
-      return `hsl(${Math.abs(hash) % 360}, 50%, 78%)`;
+      return `hsl(${Math.abs(hash) % 360}, 48%, 80%)`;
+    }
+
+    // ── Time formatting ───────────────────────────────────────────────────────
+
+    /**
+     * Formats minutes-from-midnight as "H:MM".
+     *
+     * @param {number} min
+     * @returns {string}
+     */
+    function formatTime(min) {
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      return `${h}:${m.toString().padStart(2, '0')}`;
+    }
+
+    // Row height scaling: 2 px per minute, minimum 28 px.
+    // This keeps 80-min teaching periods tall (160 px) and short advisory
+    // periods compact but readable (28 px for 10-min Lunch Pt 2).
+    const PX_PER_MIN = 2;
+    const MIN_ROW_PX = 28;
+
+    function rowHeight(durationMin) {
+      return Math.max(MIN_ROW_PX, durationMin * PX_PER_MIN);
     }
 
     // ── Bootstrap ─────────────────────────────────────────────────────────────
 
-    /**
-     * Calls the Apps Script backend for timetable data.
-     * Falls back to window.__MOCK_DATA__ when running outside Apps Script.
-     */
     function init() {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
@@ -409,10 +469,9 @@
     }
 
     /**
-     * Receives timetable data from the backend, populates the selector,
-     * and renders the initial grid.
+     * Receives timetable data, populates the group selector, renders the first view.
      *
-     * @param {{ travellingGroups: Array, grids: Object }} data
+     * @param {{ periods: Array, travellingGroups: Array, grids: Object }} data
      */
     function onDataLoaded(data) {
       timetableData = data;
@@ -420,12 +479,12 @@
       const select = document.getElementById('tg-select');
       select.innerHTML = '';
 
-      // Group travelling groups by grade for <optgroup> organisation.
+      // Group by grade using the explicit `grade` field added in Code.gs.
       const byGrade = {};
       data.travellingGroups.forEach(tg => {
-        const grade = tg.label.match(/\d+/)?.[0] || '?';
-        if (!byGrade[grade]) byGrade[grade] = [];
-        byGrade[grade].push(tg);
+        const key = String(tg.grade || '?');
+        if (!byGrade[key]) byGrade[key] = [];
+        byGrade[key].push(tg);
       });
 
       Object.keys(byGrade)
@@ -436,7 +495,9 @@
           byGrade[grade].forEach(tg => {
             const opt = document.createElement('option');
             opt.value = tg.id;
-            opt.textContent = `${tg.label}  (${tg.className})`;
+            opt.textContent = tg.viewType === 'class'
+              ? `${tg.className}`
+              : `${tg.label}  (${tg.className})`;
             og.appendChild(opt);
           });
           select.appendChild(og);
@@ -455,7 +516,6 @@
       renderGrid();
     }
 
-    /** Displays a backend error in place of the grid. */
     function onError(err) {
       document.getElementById('loading').style.display = 'none';
       const el = document.getElementById('error');
@@ -472,25 +532,63 @@
       renderGrid();
     }
 
+    // ── Subject filter ────────────────────────────────────────────────────────
+
+    /**
+     * Toggles a subject highlight filter.
+     * First click highlights one subject and fades all others.
+     * Clicking the same subject again clears the filter.
+     *
+     * @param {string} short  Subject short code
+     */
+    function toggleFilter(short) {
+      currentFilter = currentFilter === short ? null : short;
+      applyFilter();
+    }
+
+    /**
+     * Applies or clears the current subject filter without re-rendering the grid.
+     * Called after every render to restore state when the TG or semester changes.
+     */
+    function applyFilter() {
+      const gridsEl = document.getElementById('grids');
+
+      if (currentFilter) {
+        gridsEl.classList.add('filter-active');
+        document.querySelectorAll('.slot').forEach(el => {
+          el.classList.toggle('filter-match', el.dataset.subject === currentFilter);
+        });
+        document.querySelectorAll('.legend-item').forEach(el => {
+          el.classList.toggle('active', el.dataset.subject === currentFilter);
+        });
+      } else {
+        gridsEl.classList.remove('filter-active');
+        document.querySelectorAll('.slot').forEach(el => el.classList.remove('filter-match'));
+        document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+      }
+    }
+
     // ── Grid rendering ────────────────────────────────────────────────────────
 
-    const PERIOD_INFO = {
-      1: { label: 'Period 1', time: '8:15–9:35' },
-      2: { label: 'Period 2', time: '9:45–11:05' },
-      3: { label: 'Period 3', time: '12:10–13:30' },
-      4: { label: 'Period 4', time: '13:40–15:00' }
-    };
+    // Teaching periods: anything that isn't a named break or lunch.
+    // Used to style rows differently so non-teaching rows are visually quieter.
+    const NON_TEACHING_LABELS = new Set([
+      'Lunch Pt 1', 'Lunch Pt 2', 'Lunch 1', 'Lunch 2',
+      'Break', 'Reg', 'Registration'
+    ]);
 
     const DAYS = [1, 2, 3, 4, 5];
 
     /**
-     * Renders Week A and Week B as stacked table blocks inside #grids,
-     * then updates the legend sidebar.
+     * Builds Week A and Week B table blocks from the current TG/semester selection.
+     * Rows are sized proportionally to period duration using inline height values.
+     * Calls applyFilter() at the end to restore any active subject highlight.
      */
     function renderGrid() {
       if (!currentTg || !timetableData) return;
 
       const semData = timetableData.grids[currentTg.id]?.[currentSem];
+      const periods = timetableData.periods;
       const gridsEl = document.getElementById('grids');
       gridsEl.innerHTML = '';
 
@@ -499,7 +597,6 @@
       ['A', 'B'].forEach(week => {
         const weekData = semData?.[week];
 
-        // Week block wrapper
         const block = document.createElement('div');
         block.className = 'week-block';
 
@@ -508,11 +605,10 @@
         titleEl.textContent = `Week ${week}`;
         block.appendChild(titleEl);
 
-        // Table
         const table = document.createElement('table');
         table.className = 'timetable';
 
-        // <colgroup>: period column is fixed-width; day columns share the rest equally
+        // <colgroup>: period label column fixed, day columns equal
         const cg = document.createElement('colgroup');
         const cpPeriod = document.createElement('col');
         cpPeriod.className = 'col-period';
@@ -524,7 +620,7 @@
         });
         table.appendChild(cg);
 
-        // <thead>
+        // Header row: D1 … D5
         const thead = document.createElement('thead');
         const headRow = document.createElement('tr');
         const thCorner = document.createElement('th');
@@ -538,22 +634,26 @@
         thead.appendChild(headRow);
         table.appendChild(thead);
 
-        // <tbody>
+        // Body: one row per period from the periods array
         const tbody = document.createElement('tbody');
-        for (let period = 1; period <= 4; period++) {
-          const tr = document.createElement('tr');
 
-          // Period label
+        periods.forEach(period => {
+          const isNonTeaching = NON_TEACHING_LABELS.has(period.label);
+          const tr = document.createElement('tr');
+          if (isNonTeaching) tr.classList.add('non-teaching');
+
+          // Period label cell — height sets the row height proportionally
           const tdLabel = document.createElement('td');
           tdLabel.className = 'period-label';
+          tdLabel.style.height = rowHeight(period.durationMin) + 'px';
           tdLabel.innerHTML = `
-            <div class="period-name">${PERIOD_INFO[period].label}</div>
-            <div class="period-time">${PERIOD_INFO[period].time}</div>
+            <div class="period-name">${period.label}</div>
+            <div class="period-time">${formatTime(period.startMin)}–${formatTime(period.endMin)}</div>
           `;
           tr.appendChild(tdLabel);
 
           DAYS.forEach(day => {
-            const slots = weekData?.[day]?.[period] || [];
+            const slots = weekData?.[day]?.[period.period] || [];
 
             const td = document.createElement('td');
             td.className = 'grid-cell' + (slots.length === 0 ? ' empty' : '');
@@ -567,13 +667,13 @@
 
                 const div = document.createElement('div');
                 div.className = 'slot';
+                div.dataset.subject = slot.subjectShort;  // used by filter CSS
                 div.style.background = subjectColour(slot.subjectShort);
 
                 const subgroupHtml = (slots.length > 1 && slot.subGroupNames.length > 0)
-                  ? `<div class="slot-subgroups">${slot.subGroupNames.join(', ')}</div>`
+                  ? `<div class="slot-subgroups">${slot.subGroupNames.join('<br>')}</div>`
                   : '';
 
-                // slot.teacher is the full teacher name from the backend
                 div.innerHTML = `
                   <div class="slot-subject">${slot.subjectShort}</div>
                   <div class="slot-teacher">${slot.teacher}</div>
@@ -598,7 +698,7 @@
           });
 
           tbody.appendChild(tr);
-        }
+        });
 
         table.appendChild(tbody);
         block.appendChild(table);
@@ -606,25 +706,32 @@
       });
 
       renderLegend(usedSubjects);
+      applyFilter();   // restore any active highlight after re-render
     }
 
     /**
      * Populates the right-hand legend sidebar.
-     * Sorted alphabetically by subject short code.
+     * Each item is clickable and triggers toggleFilter().
      *
      * @param {Object} usedSubjects  short → full name
      */
     function renderLegend(usedSubjects) {
-      const legend = document.getElementById('legend');
-      const title  = document.getElementById('legend-title');
+      const legend   = document.getElementById('legend');
+      const title    = document.getElementById('legend-title');
+      const hint     = document.getElementById('legend-hint');
       legend.innerHTML = '';
       legend.appendChild(title);
+      legend.appendChild(hint);
 
       Object.entries(usedSubjects)
         .sort((a, b) => a[0].localeCompare(b[0]))
         .forEach(([short, name]) => {
           const item = document.createElement('div');
           item.className = 'legend-item';
+          item.dataset.subject = short;
+          item.title = `Click to highlight ${name}`;
+          item.onclick = () => toggleFilter(short);
+
           item.innerHTML = `
             <div class="legend-swatch" style="background:${subjectColour(short)}"></div>
             <div>
