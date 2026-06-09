@@ -1,0 +1,10 @@
+# Timetable XML lives in Google Drive — do not commit.
+# Upload to Drive and keep the filename matching XML_FILENAME in Code.gs.
+*.xml
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp
