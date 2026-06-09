@@ -188,20 +188,25 @@
     .slot-room    { font-size: 9px; color: rgba(0,0,0,0.5); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .slot-subgroups { font-size: 8.5px; color: rgba(0,0,0,0.4); margin-top: 2px; font-style: italic; line-height: 1.2; overflow: hidden; }
 
-    /* Compact density: 3 splits — hide room, clip teacher to 1 line */
+    /*
+     * Density classes control what's visible as split count increases.
+     * Sub-groups are the key discriminator between splits — they're always
+     * shown when a cell is split, and are the last thing to shrink.
+     * Teacher and room are decorative by comparison and fade first.
+     */
+
+    /* 3 splits: clip teacher to 1 line, hide room */
     .slot-row.density-compact .slot-teacher { -webkit-line-clamp: 1; font-size: 9px; }
     .slot-row.density-compact .slot-room    { display: none; }
-    .slot-row.density-compact .slot-subgroups { display: none; }
 
-    /* Dense: 4-5 splits — hide everything except subject and one-line teacher */
-    .slot-row.density-dense .slot-teacher  { -webkit-line-clamp: 1; font-size: 8.5px; }
+    /* 4-5 splits: hide teacher and room, keep sub-groups */
+    .slot-row.density-dense .slot-teacher  { display: none; }
     .slot-row.density-dense .slot-room     { display: none; }
-    .slot-row.density-dense .slot-subgroups { display: none; }
 
-    /* Ultra-dense: 6+ splits — subject only */
+    /* 6+ splits: subject + sub-groups only, smaller text */
     .slot-row.density-ultra .slot-teacher  { display: none; }
     .slot-row.density-ultra .slot-room     { display: none; }
-    .slot-row.density-ultra .slot-subgroups { display: none; }
+    .slot-row.density-ultra .slot-subgroups { font-size: 8px; }
 
     /* ── Subject filter ────────────────────────────────────────────────────── */
     /*
@@ -565,15 +570,20 @@
                 div.dataset.subject = slot.subjectShort;
                 div.style.background = subjectColour(slot.subjectShort);
 
-                const sgHtml = slot.subGroupNames.length > 0
+                // Sub-group labels are only meaningful when the cell is split —
+                // in a single-slot cell the whole group is together, so showing
+                // group names (e.g. "1-1, 1-2, 1-3") adds noise not information.
+                const sgHtml = (slots.length > 1 && slot.subGroupNames.length > 0)
                   ? `<div class="slot-subgroups">${slot.subGroupNames.join('<br>')}</div>`
                   : '';
 
+                // Sub-groups appear before teacher so they're visible even when
+                // teacher is hidden by a density class.
                 div.innerHTML = `
                   <div class="slot-subject">${slot.subjectShort}</div>
+                  ${sgHtml}
                   <div class="slot-teacher">${slot.teacher}</div>
                   <div class="slot-room">${slot.roomShort}</div>
-                  ${sgHtml}
                 `;
                 div.title = [
                   slot.subject, slot.teacher, slot.room,
