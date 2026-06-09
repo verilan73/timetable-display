@@ -17,7 +17,7 @@
       min-height: 100vh;
     }
 
-    /* ── Loading screen ────────────────────────────────────────────────────── */
+    /* ── Loading ───────────────────────────────────────────────────────────── */
     #loading {
       display: flex;
       flex-direction: column;
@@ -36,7 +36,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Error state ───────────────────────────────────────────────────────── */
+    /* ── Error ─────────────────────────────────────────────────────────────── */
     #error {
       display: none;
       margin: 40px auto;
@@ -48,7 +48,7 @@
       color: #c62828;
     }
 
-    /* ── Main layout ───────────────────────────────────────────────────────── */
+    /* ── App shell ─────────────────────────────────────────────────────────── */
     #app { display: none; padding: 16px; }
 
     /* ── Controls bar ──────────────────────────────────────────────────────── */
@@ -59,27 +59,23 @@
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
-
     #controls h1 {
       font-size: 18px;
       font-weight: 600;
       color: #1a1a2e;
       flex-shrink: 0;
     }
-
     .control-group {
       display: flex;
       align-items: center;
       gap: 8px;
     }
-
     .control-group label {
       font-size: 12px;
       font-weight: 500;
       color: #555;
       white-space: nowrap;
     }
-
     select {
       padding: 6px 10px;
       border: 1px solid #ccd;
@@ -88,7 +84,6 @@
       font-size: 13px;
       color: #1a1a2e;
       cursor: pointer;
-      appearance: auto;
     }
     select:focus { outline: 2px solid #4a6fa5; outline-offset: 1px; }
 
@@ -116,64 +111,77 @@
     }
     .toggle button:not(.active):hover { background: #f0f2f5; }
 
-    /* ── Grid wrapper ──────────────────────────────────────────────────────── */
-    #grid-wrapper {
-      overflow-x: auto;
+    /* ── Main content: grids + sidebar ────────────────────────────────────── */
+    #main-layout {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    /* Grids column — takes all remaining space */
+    #grids {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Week block ────────────────────────────────────────────────────────── */
+    .week-block {
       border-radius: 10px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    .week-title {
+      background: #1a1a2e;
+      color: white;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 8px 14px;
     }
 
     /* ── Timetable table ───────────────────────────────────────────────────── */
     table.timetable {
-      border-collapse: collapse;
+      /* table-layout:fixed means the browser honours <col> widths and
+         divides remaining space equally across columns with no explicit width,
+         giving all five day columns identical widths */
+      table-layout: fixed;
       width: 100%;
-      min-width: 900px;
+      border-collapse: collapse;
       background: white;
     }
 
-    /* Header rows */
+    col.col-period { width: 90px; }
+    /* col-day: no explicit width — equal share of the remainder */
+
+    /* Day header row */
     table.timetable thead th {
-      background: #1a1a2e;
-      color: white;
+      background: #2c2c44;
+      color: #aab;
+      font-size: 12px;
       font-weight: 600;
       text-align: center;
-      padding: 8px 4px;
-    }
-    table.timetable thead th.week-header {
-      font-size: 14px;
-      letter-spacing: 0.04em;
-      padding: 10px 4px;
-    }
-    table.timetable thead th.day-header {
-      font-size: 12px;
-      color: #aab;
-      font-weight: 500;
       padding: 6px 4px;
+      letter-spacing: 0.04em;
     }
-    /* Period label column header */
-    table.timetable thead th.corner { background: #111; }
-
-    /* Visual separator between Week A and Week B */
-    .week-sep {
-      width: 8px;
-      background: #e8eaf0 !important;
-      padding: 0 !important;
-      border: none !important;
+    table.timetable thead th.th-period {
+      background: #1a1a2e;
     }
 
     /* Period label cells */
     td.period-label {
       background: #f7f8fa;
       border-right: 2px solid #e0e2ea;
-      padding: 8px 12px;
+      border-bottom: 1px solid #e8eaf0;
+      padding: 8px 10px;
       text-align: right;
-      white-space: nowrap;
       vertical-align: middle;
-      min-width: 88px;
     }
     td.period-label .period-name {
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 700;
+      font-size: 12px;
       color: #1a1a2e;
     }
     td.period-label .period-time {
@@ -187,11 +195,10 @@
       border: 1px solid #e8eaf0;
       vertical-align: stretch;
       padding: 0;
-      min-width: 80px;
     }
     td.grid-cell.empty { background: #fafbfc; }
 
-    /* Slot container — horizontal flex for sub-group splits */
+    /* Slot row — horizontal flex for sub-group splits */
     .slot-row {
       display: flex;
       flex-direction: row;
@@ -199,14 +206,14 @@
       min-height: 80px;
     }
 
-    /* Individual slot (one subject/sub-group) */
+    /* Individual slot */
     .slot {
       flex: 1 1 0;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding: 5px 6px;
-      border-right: 1px solid rgba(0,0,0,0.06);
+      border-right: 1px solid rgba(0,0,0,0.07);
       overflow: hidden;
       min-width: 0;
     }
@@ -217,71 +224,88 @@
       font-size: 12px;
       line-height: 1.2;
       color: rgba(0,0,0,0.82);
-      word-break: break-word;
     }
 
-    .slot-detail {
+    /* Full teacher name — 2-line clamp keeps cells compact */
+    .slot-teacher {
       font-size: 10px;
-      color: rgba(0,0,0,0.6);
-      line-height: 1.4;
+      color: rgba(0,0,0,0.65);
+      line-height: 1.3;
       margin-top: 3px;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .slot-room {
+      font-size: 10px;
+      color: rgba(0,0,0,0.5);
+      margin-top: 2px;
     }
 
     .slot-subgroups {
       font-size: 9px;
-      color: rgba(0,0,0,0.45);
+      color: rgba(0,0,0,0.4);
       margin-top: 4px;
       font-style: italic;
     }
 
-    /* Week separator column */
-    td.week-sep-cell {
-      width: 8px;
-      background: #e8eaf0;
-      border: none;
-      padding: 0;
-    }
-
-    /* Alternating row shading */
-    tbody tr:nth-child(even) td.period-label { background: #f0f2f7; }
-
-    /* ── Legend ────────────────────────────────────────────────────────────── */
+    /* ── Legend sidebar ────────────────────────────────────────────────────── */
     #legend {
-      margin-top: 12px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 10px 12px;
+      flex-shrink: 0;
+      width: 168px;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      padding: 10px;
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+    }
+    #legend-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #888;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
     }
     .legend-item {
       display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      color: #333;
+      align-items: flex-start;
+      gap: 6px;
+      margin-bottom: 6px;
+      line-height: 1.3;
     }
     .legend-swatch {
-      width: 14px; height: 14px;
+      width: 14px;
+      height: 14px;
       border-radius: 3px;
       flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .legend-short {
+      font-weight: 700;
+      font-size: 11px;
+      color: #1a1a2e;
+    }
+    .legend-name {
+      font-size: 10px;
+      color: #666;
     }
   </style>
 </head>
 <body>
 
-  <!-- Loading state -->
   <div id="loading">
     <div class="spinner"></div>
     <div>Loading timetable data…</div>
   </div>
 
-  <!-- Error state -->
   <div id="error"></div>
 
-  <!-- Main app (hidden until data loads) -->
   <div id="app">
     <div id="controls">
       <h1>Timetable Viewer</h1>
@@ -295,16 +319,20 @@
         <label>Semester</label>
         <div class="toggle">
           <button id="btn-s1" class="active" onclick="setSemester('S1')">Semester 1</button>
-          <button id="btn-s2" onclick="setSemester('S2')">Semester 2</button>
+          <button id="btn-s2"                onclick="setSemester('S2')">Semester 2</button>
         </div>
       </div>
     </div>
 
-    <div id="grid-wrapper">
-      <table class="timetable" id="timetable"></table>
+    <div id="main-layout">
+      <div id="grids">
+        <!-- Week A and Week B blocks rendered by renderGrid() -->
+      </div>
+      <div id="legend">
+        <div id="legend-title">Subjects</div>
+        <!-- legend items rendered by renderLegend() -->
+      </div>
     </div>
-
-    <div id="legend"></div>
   </div>
 
   <script>
@@ -314,63 +342,58 @@
     let currentSem    = 'S1';
 
     // ── Subject colour map ────────────────────────────────────────────────────
-    // Curated colours for known subjects; unknown subjects get a generated hue.
     const SUBJECT_COLOURS = {
-      // Sciences — greens
+      // Sciences
       'SCI':   '#a5d6a7', 'BIO': '#80c784', 'CHE': '#66bb6a',
       'PHY':   '#4caf50', 'ESS': '#81c784',
-      // Mathematics — blues
+      // Mathematics
       'MAT':   '#90caf9', 'MATSt': '#64b5f6', 'MATEx': '#42a5f5',
       'MAA':   '#2196f3', 'MAI': '#1976d2',
-      // English — ambers
+      // English
       'EngLL': '#ffcc80', 'EngLA': '#ffb74d',
-      // Korean — oranges/reds
+      // Korean
       'KorLL': '#ff8a65', 'KorLA': '#ff7043', 'KAH': '#e64a19',
-      // Chinese — pinks/roses
+      // Chinese
       'ChiLL': '#f48fb1', 'ChiLi': '#f06292',
       // Other languages
       'SSST':  '#ce93d8', 'Pam': '#ab47bc',
-      // Humanities — purples
+      // Humanities
       'HUM':   '#ce93d8', 'HIS': '#ba68c8', 'GEO': '#ab47bc',
       'ECO':   '#9c27b0', 'BUS': '#7b1fa2', 'PSY': '#6a1b9a',
-      // Arts — teals/cyans
+      // Arts
       'MUS':   '#80deea', 'VIS': '#4dd0e1', 'DAN': '#26c6da',
       'THE':   '#00acc1', 'FILM': '#00838f',
-      // PHE & sport — greens/teals
+      // PHE & sport
       'PHE':   '#a5d6a7', 'PHEICE': '#4db6ac', 'SEH': '#80cbc4',
-      // Design — browns/ochres
+      // Design
       'DES':   '#ffcc80', 'DTEC': '#ffa726', 'PRO': '#fb8c00',
       'ROB':   '#f57c00', 'DMD': '#e65100', 'ENT': '#ffb300',
-      // Core / advisory / TOK
+      // Core / advisory
       'TOK':   '#ef9a9a', 'COR': '#e0e0e0', 'ADV': '#eeeeee',
-      'STU':   '#f5f5f5', 'Protect': '#f5f5f5',
-      'Collab Time': '#e8eaf6',
+      'STU':   '#f5f5f5', 'Protect': '#f5f5f5', 'Collab Time': '#e8eaf6',
     };
 
     /**
-     * Returns a background colour for a given subject short code.
-     * Falls back to a deterministic hue derived from the string.
+     * Returns a stable background colour for a subject short code.
+     * Unknown subjects fall back to a deterministic hue from the string hash.
      *
-     * @param {string} short Subject short code (e.g. 'SCI', 'MAT')
-     * @returns {string} CSS colour string
+     * @param {string} short
+     * @returns {string} CSS colour
      */
     function subjectColour(short) {
       if (SUBJECT_COLOURS[short]) return SUBJECT_COLOURS[short];
-      // Deterministic hash → hue so the same subject always gets the same colour.
       let hash = 0;
       for (let i = 0; i < short.length; i++) {
         hash = short.charCodeAt(i) + ((hash << 5) - hash);
       }
-      const hue = Math.abs(hash) % 360;
-      return `hsl(${hue}, 55%, 78%)`;
+      return `hsl(${Math.abs(hash) % 360}, 50%, 78%)`;
     }
 
-    // ── Initialisation ────────────────────────────────────────────────────────
+    // ── Bootstrap ─────────────────────────────────────────────────────────────
 
     /**
-     * Fetches timetable data from the Apps Script backend.
-     * Falls back to window.__MOCK_DATA__ when running outside Apps Script
-     * (useful during local development).
+     * Calls the Apps Script backend for timetable data.
+     * Falls back to window.__MOCK_DATA__ when running outside Apps Script.
      */
     function init() {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -386,44 +409,44 @@
     }
 
     /**
-     * Called when data arrives from the backend.
-     * Populates the selector and renders the initial grid.
+     * Receives timetable data from the backend, populates the selector,
+     * and renders the initial grid.
      *
-     * @param {Object} data  { travellingGroups, grids }
+     * @param {{ travellingGroups: Array, grids: Object }} data
      */
     function onDataLoaded(data) {
       timetableData = data;
 
-      // Populate the travelling group dropdown.
       const select = document.getElementById('tg-select');
       select.innerHTML = '';
 
-      // Group by grade for optgroup organisation.
+      // Group travelling groups by grade for <optgroup> organisation.
       const byGrade = {};
       data.travellingGroups.forEach(tg => {
-        const grade = tg.label.replace(/[^\d].*/, ''); // first number
+        const grade = tg.label.match(/\d+/)?.[0] || '?';
         if (!byGrade[grade]) byGrade[grade] = [];
         byGrade[grade].push(tg);
       });
 
-      Object.keys(byGrade).sort((a, b) => parseInt(a) - parseInt(b)).forEach(grade => {
-        const og = document.createElement('optgroup');
-        og.label = `Grade ${grade}`;
-        byGrade[grade].forEach(tg => {
-          const opt = document.createElement('option');
-          opt.value = tg.id;
-          opt.textContent = `${tg.label}  (${tg.className})`;
-          og.appendChild(opt);
+      Object.keys(byGrade)
+        .sort((a, b) => parseInt(a) - parseInt(b))
+        .forEach(grade => {
+          const og = document.createElement('optgroup');
+          og.label = `Grade ${grade}`;
+          byGrade[grade].forEach(tg => {
+            const opt = document.createElement('option');
+            opt.value = tg.id;
+            opt.textContent = `${tg.label}  (${tg.className})`;
+            og.appendChild(opt);
+          });
+          select.appendChild(og);
         });
-        select.appendChild(og);
-      });
 
       select.addEventListener('change', () => {
         currentTg = timetableData.travellingGroups.find(t => t.id === select.value);
         renderGrid();
       });
 
-      // Select the first travelling group by default.
       currentTg = data.travellingGroups[0];
       if (currentTg) select.value = currentTg.id;
 
@@ -432,7 +455,7 @@
       renderGrid();
     }
 
-    /** Displays an error message. */
+    /** Displays a backend error in place of the grid. */
     function onError(err) {
       document.getElementById('loading').style.display = 'none';
       const el = document.getElementById('error');
@@ -442,11 +465,6 @@
 
     // ── Semester toggle ───────────────────────────────────────────────────────
 
-    /**
-     * Switches the active semester and re-renders the grid.
-     *
-     * @param {'S1'|'S2'} sem
-     */
     function setSemester(sem) {
       currentSem = sem;
       document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
@@ -463,75 +481,79 @@
       4: { label: 'Period 4', time: '13:40–15:00' }
     };
 
-    const DAYS = ['D1', 'D2', 'D3', 'D4', 'D5'];
+    const DAYS = [1, 2, 3, 4, 5];
 
     /**
-     * Builds and inserts the full 10-day timetable grid for the current
-     * travelling group and semester.
+     * Renders Week A and Week B as stacked table blocks inside #grids,
+     * then updates the legend sidebar.
      */
     function renderGrid() {
       if (!currentTg || !timetableData) return;
 
-      const grid = timetableData.grids[currentTg.id];
-      if (!grid) return;
+      const semData = timetableData.grids[currentTg.id]?.[currentSem];
+      const gridsEl = document.getElementById('grids');
+      gridsEl.innerHTML = '';
 
-      const semData = grid[currentSem];
-      const table   = document.getElementById('timetable');
-      const usedSubjects = {};  // short → name, for legend
+      const usedSubjects = {};
 
-      // ── Build header ──────────────────────────────────────────────────────
-      const thead = document.createElement('thead');
+      ['A', 'B'].forEach(week => {
+        const weekData = semData?.[week];
 
-      // Row 1: Week labels spanning 5 day columns each.
-      const weekRow = document.createElement('tr');
-      weekRow.innerHTML = `
-        <th class="corner" rowspan="2"></th>
-        <th class="week-header" colspan="5">Week A</th>
-        <th class="week-sep" rowspan="2"></th>
-        <th class="week-header" colspan="5">Week B</th>
-      `;
-      thead.appendChild(weekRow);
+        // Week block wrapper
+        const block = document.createElement('div');
+        block.className = 'week-block';
 
-      // Row 2: Individual day labels.
-      const dayRow = document.createElement('tr');
-      ['A', 'B'].forEach((week, wi) => {
-        DAYS.forEach(day => {
-          const th = document.createElement('th');
-          th.className = 'day-header';
-          th.textContent = day;
-          dayRow.appendChild(th);
+        const titleEl = document.createElement('div');
+        titleEl.className = 'week-title';
+        titleEl.textContent = `Week ${week}`;
+        block.appendChild(titleEl);
+
+        // Table
+        const table = document.createElement('table');
+        table.className = 'timetable';
+
+        // <colgroup>: period column is fixed-width; day columns share the rest equally
+        const cg = document.createElement('colgroup');
+        const cpPeriod = document.createElement('col');
+        cpPeriod.className = 'col-period';
+        cg.appendChild(cpPeriod);
+        DAYS.forEach(() => {
+          const cd = document.createElement('col');
+          cd.className = 'col-day';
+          cg.appendChild(cd);
         });
-        // Separator placeholder already handled by rowspan above; skip for B.
-      });
-      thead.appendChild(dayRow);
+        table.appendChild(cg);
 
-      // ── Build body ────────────────────────────────────────────────────────
-      const tbody = document.createElement('tbody');
+        // <thead>
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        const thCorner = document.createElement('th');
+        thCorner.className = 'th-period';
+        headRow.appendChild(thCorner);
+        DAYS.forEach(d => {
+          const th = document.createElement('th');
+          th.textContent = `D${d}`;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
 
-      for (let period = 1; period <= 4; period++) {
-        const tr = document.createElement('tr');
+        // <tbody>
+        const tbody = document.createElement('tbody');
+        for (let period = 1; period <= 4; period++) {
+          const tr = document.createElement('tr');
 
-        // Period label cell.
-        const tdLabel = document.createElement('td');
-        tdLabel.className = 'period-label';
-        tdLabel.innerHTML = `
-          <div class="period-name">${PERIOD_INFO[period].label}</div>
-          <div class="period-time">${PERIOD_INFO[period].time}</div>
-        `;
-        tr.appendChild(tdLabel);
+          // Period label
+          const tdLabel = document.createElement('td');
+          tdLabel.className = 'period-label';
+          tdLabel.innerHTML = `
+            <div class="period-name">${PERIOD_INFO[period].label}</div>
+            <div class="period-time">${PERIOD_INFO[period].time}</div>
+          `;
+          tr.appendChild(tdLabel);
 
-        ['A', 'B'].forEach((week, wi) => {
-          // Insert visual separator before Week B.
-          if (wi === 1) {
-            const sep = document.createElement('td');
-            sep.className = 'week-sep-cell';
-            tr.appendChild(sep);
-          }
-
-          for (let day = 1; day <= 5; day++) {
-            const slots = (semData && semData[week] && semData[week][day])
-              ? semData[week][day][period]
-              : [];
+          DAYS.forEach(day => {
+            const slots = weekData?.[day]?.[period] || [];
 
             const td = document.createElement('td');
             td.className = 'grid-cell' + (slots.length === 0 ? ' empty' : '');
@@ -543,23 +565,22 @@
               slots.forEach(slot => {
                 usedSubjects[slot.subjectShort] = slot.subject;
 
-                const colour = subjectColour(slot.subjectShort);
                 const div = document.createElement('div');
                 div.className = 'slot';
-                div.style.background = colour;
+                div.style.background = subjectColour(slot.subjectShort);
 
-                // Sub-group label: only shown when the travelling group splits.
-                const subGroupText = (slots.length > 1 && slot.subGroupNames.length > 0)
+                const subgroupHtml = (slots.length > 1 && slot.subGroupNames.length > 0)
                   ? `<div class="slot-subgroups">${slot.subGroupNames.join(', ')}</div>`
                   : '';
 
+                // slot.teacher is the full teacher name from the backend
                 div.innerHTML = `
                   <div class="slot-subject">${slot.subjectShort}</div>
-                  <div class="slot-detail">${slot.teacherShort}<br>${slot.roomShort}</div>
-                  ${subGroupText}
+                  <div class="slot-teacher">${slot.teacher}</div>
+                  <div class="slot-room">${slot.roomShort}</div>
+                  ${subgroupHtml}
                 `;
 
-                // Tooltip with full names on hover.
                 div.title = [
                   slot.subject,
                   slot.teacher,
@@ -574,37 +595,42 @@
             }
 
             tr.appendChild(td);
-          }
-        });
+          });
 
-        tbody.appendChild(tr);
-      }
+          tbody.appendChild(tr);
+        }
 
-      // Replace table contents.
-      table.innerHTML = '';
-      table.appendChild(thead);
-      table.appendChild(tbody);
+        table.appendChild(tbody);
+        block.appendChild(table);
+        gridsEl.appendChild(block);
+      });
 
       renderLegend(usedSubjects);
     }
 
     /**
-     * Renders a colour legend for all subjects appearing in the current grid.
+     * Populates the right-hand legend sidebar.
+     * Sorted alphabetically by subject short code.
      *
-     * @param {Object} usedSubjects  Map of short code → full name
+     * @param {Object} usedSubjects  short → full name
      */
     function renderLegend(usedSubjects) {
       const legend = document.getElementById('legend');
+      const title  = document.getElementById('legend-title');
       legend.innerHTML = '';
+      legend.appendChild(title);
 
       Object.entries(usedSubjects)
-        .sort((a, b) => a[1].localeCompare(b[1]))
+        .sort((a, b) => a[0].localeCompare(b[0]))
         .forEach(([short, name]) => {
           const item = document.createElement('div');
           item.className = 'legend-item';
           item.innerHTML = `
             <div class="legend-swatch" style="background:${subjectColour(short)}"></div>
-            <span><strong>${short}</strong> ${name}</span>
+            <div>
+              <div class="legend-short">${short}</div>
+              <div class="legend-name">${name}</div>
+            </div>
           `;
           legend.appendChild(item);
         });

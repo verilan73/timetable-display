@@ -1,20 +1,27 @@
 /**
  * @fileoverview Timetable Travelling Group Viewer — Google Apps Script backend.
  *
- * Reads the aSc Timetables XML export from Google Drive and returns structured
- * schedule data to the browser for interactive display.
+ * Reads the aSc Timetables XML export from a specific Google Drive folder and
+ * returns structured schedule data to the browser for interactive display.
  *
  * Setup:
- *  1. Upload your timetable XML file to Google Drive (root or any accessible folder).
+ *  1. Upload your timetable XML to the folder identified by TIMETABLE_FOLDER_ID.
  *  2. Copy this file and Index.html into a new Apps Script project
  *     (script.google.com > New project).
  *  3. Deploy > New deployment > Web app.
  *     Execute as: Me | Who has access: Anyone in your organisation.
+ *     (Users do NOT need Drive access — the script reads the file as you.)
  *  4. Copy the deployment URL and embed it in Google Sites via Insert > Embed.
  */
 
-/** Name of the XML file to locate in Google Drive. */
+/** Name of the XML file to locate in the timetable folder. */
 const XML_FILENAME = 'asctt2012.xml';
+
+/**
+ * ID of the Shared Drive folder that holds the timetable XML.
+ * Extract from the folder URL: drive.google.com/drive/.../folders/<ID>
+ */
+const TIMETABLE_FOLDER_ID = '1HP8gmuAjCm8AsqxRlTaS-OI2uMlK1Z54';
 
 /**
  * Grades that use the travelling-group system. Groups in these grades whose
@@ -56,20 +63,24 @@ function getTimetableData() {
 // ── XML loading ───────────────────────────────────────────────────────────────
 
 /**
- * Finds and parses the timetable XML from Google Drive by filename.
- * If multiple files share the name, the most recently modified is used.
+ * Finds and parses the timetable XML from the designated Shared Drive folder.
+ * Scoping to one folder avoids any ambiguity when multiple XML exports exist
+ * across Drive. If multiple copies share the filename, the most recently
+ * modified is used.
  *
- * @see https://developers.google.com/apps-script/reference/drive/drive-app#getFilesByName(String)
+ * @see https://developers.google.com/apps-script/reference/drive/drive-app#getFolderById(String)
  * @returns {GoogleAppsScript.XML_Service.Document}
- * @throws {Error} If no matching file is found.
+ * @throws {Error} If the folder or file cannot be found.
  */
 function loadXmlFromDrive() {
-  // https://developers.google.com/apps-script/reference/drive/drive-app
-  const files = DriveApp.getFilesByName(XML_FILENAME);
+  // getFolderById works with Shared Drives under the V8 runtime.
+  // https://developers.google.com/apps-script/reference/drive/drive-app#getFolderById(String)
+  const folder = DriveApp.getFolderById(TIMETABLE_FOLDER_ID);
+  const files = folder.getFilesByName(XML_FILENAME);
   if (!files.hasNext()) {
     throw new Error(
-      `"${XML_FILENAME}" was not found in Google Drive. ` +
-      'Upload the file and ensure it is accessible to this script.'
+      `"${XML_FILENAME}" was not found in the timetable folder (${TIMETABLE_FOLDER_ID}). ` +
+      'Upload the XML export to that folder and ensure the filename matches XML_FILENAME.'
     );
   }
   // If multiple copies exist, pick the most recently modified.
