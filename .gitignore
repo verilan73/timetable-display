@@ -2,9 +2,15 @@
 # Upload to Drive and keep the filename matching XML_FILENAME in Code.gs.
 *.xml
 
+# Sample files / supporting docs — keep in Drive, not the repo.
+*.pdf
+
 # macOS
 .DS_Store
 
 # Editor
 .vscode/
 *.swp
+
+# Claude Code project memory — machine-local, not source.
+.claude/

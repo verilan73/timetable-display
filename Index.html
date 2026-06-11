@@ -74,6 +74,19 @@
     }
     select:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
 
+    #btn-refresh-teachers {
+      padding: 6px 10px;
+      border: 1px solid #ccd;
+      border-radius: 6px;
+      background: white;
+      font-size: 12px;
+      color: #555;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #btn-refresh-teachers:hover { background: #f0f2f5; }
+    #btn-refresh-teachers:disabled { opacity: 0.5; cursor: default; }
+
     .toggle { display: flex; border: 1px solid #ccd; border-radius: 6px; overflow: hidden; }
     .toggle button {
       padding: 6px 14px;
@@ -279,6 +292,142 @@
     .legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; margin-top: 1px; }
     .legend-short  { font-weight: 700; font-size: 11px; color: #1a1a2e; line-height: 1.2; }
     .legend-name   { font-size: 9.5px; color: #666; line-height: 1.3; }
+
+    /* ── Teacher timeline ──────────────────────────────────────────────────── */
+    .loading-inline {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 40px;
+      color: #888;
+      font-size: 13px;
+    }
+
+    .timeline-body { display: flex; background: white; }
+
+    /*
+     * tl-period-strip: reference column flanking the day grid.
+     * Each period is rendered as a sized card, positioned by real clock time,
+     * so you can read straight across any horizontal band to compare both schools.
+     */
+    .tl-period-strip { width: 80px; flex-shrink: 0; display: flex; flex-direction: column; }
+    .tl-period-strip.left  { border-right: 1px solid #e8eaf0; }
+    .tl-period-strip.right { border-left:  1px solid #e8eaf0; }
+
+    /* Header matches .tl-days-header .th-day exactly so bodies align. */
+    .tl-strip-header {
+      background: #2c2c44;
+      color: #aab;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 5px 4px;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .tl-strip-body { position: relative; background: #fafafa; }
+
+    .tl-period-card {
+      position: absolute;
+      left: 3px; right: 3px;
+      border-radius: 3px;
+      padding: 2px 5px;
+      overflow: hidden;
+    }
+    .tl-period-card.teaching {
+      background: rgba(0,0,0,0.04);
+      border: 1px solid rgba(0,0,0,0.09);
+    }
+    /* Non-teaching slots (Reg, Break, Lunch): very muted, no border */
+    .tl-period-card.non-teaching { background: rgba(0,0,0,0.015); }
+
+    .tl-pc-name { display: block; font-weight: 700; font-size: 9px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tl-pc-time { display: block; font-size: 7.5px; color: #aaa; white-space: nowrap; }
+
+    .tl-days { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .tl-days-header { display: flex; background: #2c2c44; }
+    .tl-days-header .th-day {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: #aab;
+      padding: 5px 4px;
+      letter-spacing: 0.04em;
+    }
+
+    .tl-cols { display: flex; }
+
+    .tl-day-col {
+      flex: 1;
+      position: relative;
+      border-right: 1px solid #f0f2f5;
+      min-width: 0;
+    }
+    .tl-day-col:last-child { border-right: none; }
+
+    /* Guide lines at every period boundary (both schools) */
+    .tl-guide {
+      position: absolute;
+      left: 0; right: 0;
+      height: 1px;
+      background: rgba(0,0,0,0.07);
+      pointer-events: none;
+    }
+
+    /* Lesson block — absolutely positioned within its day column */
+    .tl-block {
+      position: absolute;
+      left: 2px; right: 2px;
+      border-radius: 4px;
+      padding: 3px 5px;
+      overflow: hidden;
+      cursor: default;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+    .tl-block:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 1; }
+    .tl-block-header  { display: flex; justify-content: space-between; align-items: flex-start; gap: 2px; }
+    .tl-block-subject { font-weight: 700; font-size: 10.5px; line-height: 1.2; color: rgba(0,0,0,0.85); flex: 1; min-width: 0; }
+    .tl-block-class   { font-size: 9px; color: rgba(0,0,0,0.6); margin-top: 1px; line-height: 1.2; }
+    .tl-block-groups  { font-size: 8.5px; color: rgba(0,0,0,0.5); font-style: italic; }
+    .tl-block-room    { font-size: 8.5px; color: rgba(0,0,0,0.5); }
+    /* Lesson time range, pinned to the bottom-right corner of each block. */
+    .tl-block-time {
+      position: absolute;
+      bottom: 2px; right: 4px;
+      font-size: 7.5px;
+      color: rgba(0,0,0,0.45);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /*
+     * Source badge: tiny pill in the top-right corner of each block.
+     * Shows which school the lesson comes from when the column has both.
+     */
+    .tl-source {
+      font-size: 7px; font-weight: 800;
+      padding: 1px 3px;
+      border-radius: 2px;
+      line-height: 1.3;
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+    }
+    .tl-source-ms { background: rgba(0,0,0,0.12); color: rgba(0,0,0,0.6); }
+    .tl-source-js { background: rgba(139,26,74,0.18); color: #8b1a4a; }
+
+    /*
+     * Centre divider drawn inside a day column when both MSSS and JS lessons
+     * share it. Blocks left of this line are MSSS; blocks right are JS.
+     */
+    .tl-centre-divider {
+      position: absolute;
+      left: 50%; top: 0; bottom: 0;
+      width: 1px;
+      background: rgba(0,0,0,0.1);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -291,10 +440,43 @@
       <img src="https://drive.google.com/thumbnail?id=1wPCk9ZbXWmjhRyKnFdLyxT-_B9k_N3SS"
            alt="Branksome Hall Asia" class="school-logo">
       <div class="controls-divider"></div>
+      <!-- View toggle — always visible -->
       <div class="control-group">
-        <label for="tg-select">Group / Class</label>
-        <select id="tg-select"></select>
+        <label>View</label>
+        <div class="toggle">
+          <button id="btn-view-classes"  class="active" onclick="setView('classes')">Classes</button>
+          <button id="btn-view-teachers"                onclick="setView('teachers')">Teachers</button>
+        </div>
       </div>
+      <!-- Class-mode controls: school selector + group/class dropdown.
+           display:contents makes these children participate directly in the
+           parent flex layout when visible, with no wrapping box of their own. -->
+      <div id="class-controls" style="display:contents">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>School</label>
+          <div class="toggle">
+            <button id="btn-msss" class="active" onclick="setSchedule('MSSS')">MS / SS</button>
+            <button id="btn-js"                  onclick="setSchedule('JS')">Junior</button>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label id="tg-label" for="tg-select">Group / Class</label>
+          <select id="tg-select"></select>
+        </div>
+      </div>
+      <!-- Teacher-mode controls: teacher dropdown + cache-refresh button, hidden by default -->
+      <div id="teacher-controls" style="display:none">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label for="teacher-select">Teacher</label>
+          <select id="teacher-select"></select>
+        </div>
+        <button id="btn-refresh-teachers" onclick="refreshTeacherData()"
+                title="Reload teacher data from source XML files">↻ Refresh</button>
+      </div>
+      <!-- Semester toggle — always visible -->
       <div class="control-group">
         <label>Semester</label>
         <div class="toggle">
@@ -316,10 +498,16 @@
 
   <script>
     // ── State ─────────────────────────────────────────────────────────────────
-    let timetableData  = null;
-    let currentTg      = null;
-    let currentSem     = 'S1';
-    let activeFilters  = new Set();   // set of subject short codes currently highlighted
+    const allData       = { MSSS: null, JS: null };  // both schools loaded at startup
+    let timetableData   = null;
+    let currentTg       = null;
+    let currentSem      = 'S1';
+    let currentSchedule = 'MSSS';     // 'MSSS' | 'JS'
+    let activeFilters   = new Set();   // subject short codes currently highlighted
+
+    let teacherData     = null;
+    let currentTeacher  = null;
+    let currentView     = 'classes';  // 'classes' | 'teachers'
 
     // ── Colours ───────────────────────────────────────────────────────────────
     const SUBJECT_COLOURS = {
@@ -363,17 +551,98 @@
     function rowHeight(durationMin) { return Math.max(32, durationMin); }
 
     // ── Bootstrap ─────────────────────────────────────────────────────────────
-    function init() {
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
+
+    /**
+     * Wraps a google.script.run call in a Promise so we can use Promise.all
+     * for parallel fetching. fnName is the Apps Script function name; remaining
+     * args are forwarded to it.
+     */
+    function gsRun(fnName, ...args) {
+      return new Promise((resolve, reject) => {
         google.script.run
-          .withSuccessHandler(onDataLoaded)
-          .withFailureHandler(onError)
-          .getTimetableData();
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          [fnName](...args);
+      });
+    }
+
+    /**
+     * Fetches MSSS data, JS data, and teacher data in parallel so every
+     * subsequent view or school switch is an instant client-side re-render.
+     */
+    async function init() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        try {
+          const [msss, js, teachers] = await Promise.all([
+            gsRun('getTimetableData', 'MSSS'),
+            gsRun('getTimetableData', 'JS'),
+            gsRun('getTeacherData', false)
+          ]);
+          allData.MSSS = msss;
+          allData.JS   = js;
+          onTeacherDataLoaded(teachers);
+          onDataLoaded(msss);
+        } catch (err) {
+          onError(err);
+        }
       } else if (window.__MOCK_DATA__) {
+        allData.MSSS = window.__MOCK_DATA__;
+        allData.JS   = window.__MOCK_DATA__;
         onDataLoaded(window.__MOCK_DATA__);
       } else {
         onError({ message: 'Not running inside Apps Script and no mock data found.' });
       }
+    }
+
+    /** Switches school — instant: data is already loaded. */
+    function setSchedule(schedule) {
+      currentSchedule = schedule;
+      document.getElementById('btn-msss').classList.toggle('active', schedule === 'MSSS');
+      document.getElementById('btn-js').classList.toggle('active',   schedule === 'JS');
+      currentTg = null;
+      activeFilters.clear();
+      onDataLoaded(allData[schedule]);
+    }
+
+    /** Forces a cache-busting reload of teacher data from the source XMLs. */
+    async function refreshTeacherData() {
+      const btn = document.getElementById('btn-refresh-teachers');
+      if (btn) btn.disabled = true;
+      document.getElementById('grids').innerHTML =
+        `<div class="loading-inline"><div class="spinner"></div>Refreshing teacher data…</div>`;
+      try {
+        const data = await gsRun('getTeacherData', true);
+        onTeacherDataLoaded(data);
+      } catch (err) {
+        onError(err);
+      }
+    }
+
+    function onTeacherDataLoaded(data) {
+      teacherData = data;
+      const select = document.getElementById('teacher-select');
+      select.innerHTML = '';
+
+      data.teachers.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.scheduleKey;
+        opt.textContent = t.name;
+        select.appendChild(opt);
+      });
+
+      select.onchange = () => {
+        currentTeacher = teacherData.teachers.find(t => t.scheduleKey === select.value);
+        renderTeacherTimeline();
+      };
+
+      currentTeacher = data.teachers[0] || null;
+      if (currentTeacher) select.value = currentTeacher.scheduleKey;
+
+      const btn = document.getElementById('btn-refresh-teachers');
+      if (btn) btn.disabled = false;
+
+      // Re-render only when already in teacher view (not during startup pre-load).
+      if (currentView === 'teachers') renderTeacherTimeline();
     }
 
     function onDataLoaded(data) {
@@ -381,34 +650,45 @@
       const select = document.getElementById('tg-select');
       select.innerHTML = '';
 
-      const byGrade = {};
+      // Group by gradeSortOrder (numeric), label with gradeLabel (human-readable).
+      // gradeSortOrder: JK=-2, SK=-1, Grade 1=1, Grade 2=2, ... MSSS Grade 6=6, etc.
+      const byOrder = {};
       data.travellingGroups.forEach(tg => {
-        const key = String(tg.grade || '?');
-        if (!byGrade[key]) byGrade[key] = [];
-        byGrade[key].push(tg);
+        const key = tg.gradeSortOrder;
+        if (!byOrder[key]) byOrder[key] = { label: tg.gradeLabel, items: [] };
+        byOrder[key].items.push(tg);
       });
 
-      Object.keys(byGrade).sort((a, b) => parseInt(a) - parseInt(b)).forEach(grade => {
-        const og = document.createElement('optgroup');
-        og.label = `Grade ${grade}`;
-        byGrade[grade].forEach(tg => {
-          const opt = document.createElement('option');
-          opt.value = tg.id;
-          opt.textContent = tg.viewType === 'class'
-            ? tg.className
-            : `${tg.label}  (${tg.className})`;
-          og.appendChild(opt);
+      Object.keys(byOrder)
+        .sort((a, b) => Number(a) - Number(b))
+        .forEach(key => {
+          const { label, items } = byOrder[key];
+          const og = document.createElement('optgroup');
+          og.label = label;
+          items.forEach(tg => {
+            const opt = document.createElement('option');
+            opt.value = tg.id;
+            opt.textContent = tg.viewType === 'class'
+              ? tg.className
+              : `${tg.label}  (${tg.className})`;
+            og.appendChild(opt);
+          });
+          select.appendChild(og);
         });
-        select.appendChild(og);
-      });
 
-      select.addEventListener('change', () => {
+      // Assignment-style (not addEventListener) so re-loading data on school switch
+      // replaces the listener rather than stacking a second copy on top.
+      select.onchange = () => {
         currentTg = timetableData.travellingGroups.find(t => t.id === select.value);
         renderGrid();
-      });
+      };
 
       currentTg = data.travellingGroups[0];
       if (currentTg) select.value = currentTg.id;
+
+      // Update the dropdown label to match the school's terminology.
+      document.getElementById('tg-label').textContent =
+        data.schemaType === 'JS' ? 'Class' : 'Group / Class';
 
       document.getElementById('loading').style.display = 'none';
       document.getElementById('app').style.display = 'block';
@@ -422,12 +702,33 @@
       el.textContent = 'Error: ' + (err.message || JSON.stringify(err));
     }
 
+    // ── View toggle ───────────────────────────────────────────────────────────
+    function setView(view) {
+      currentView = view;
+      document.getElementById('btn-view-classes').classList.toggle('active',  view === 'classes');
+      document.getElementById('btn-view-teachers').classList.toggle('active', view === 'teachers');
+      document.getElementById('class-controls').style.display   = view === 'classes'  ? 'contents' : 'none';
+      document.getElementById('teacher-controls').style.display = view === 'teachers' ? 'contents' : 'none';
+      document.getElementById('legend').style.display           = view === 'teachers' ? 'none' : '';
+
+      if (view === 'teachers') {
+        activeFilters.clear();
+        renderTeacherTimeline();
+      } else {
+        renderGrid();
+      }
+    }
+
     // ── Semester toggle ───────────────────────────────────────────────────────
     function setSemester(sem) {
       currentSem = sem;
       document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
       document.getElementById('btn-s2').classList.toggle('active', sem === 'S2');
-      renderGrid();
+      if (currentView === 'teachers') {
+        renderTeacherTimeline();
+      } else {
+        renderGrid();
+      }
     }
 
     // ── Filter ────────────────────────────────────────────────────────────────
@@ -493,14 +794,19 @@
 
       const usedSubjects = {};
 
-      ['A', 'B'].forEach(week => {
+      // weekKeys: ['A','B'] for MSSS, ['single'] for JS.
+      const weekKeys  = timetableData.weeksMode === 'AB' ? ['A', 'B'] : ['single'];
+      // dayLabels: ['D1'…'D5'] for MSSS, ['Mon'…'Fri'] for JS.
+      const dayLabels = timetableData.dayLabels || ['D1','D2','D3','D4','D5'];
+
+      weekKeys.forEach(week => {
         const weekData = semData?.[week];
         const block    = document.createElement('div');
         block.className = 'week-block';
 
         const titleEl = document.createElement('div');
         titleEl.className = 'week-title';
-        titleEl.textContent = `Week ${week}`;
+        titleEl.textContent = week === 'single' ? 'Schedule' : `Week ${week}`;
         block.appendChild(titleEl);
 
         const table = document.createElement('table');
@@ -520,9 +826,9 @@
         const thCorner = document.createElement('th');
         thCorner.className = 'th-period';
         headRow.appendChild(thCorner);
-        DAYS.forEach(d => {
+        DAYS.forEach((d, i) => {
           const th = document.createElement('th');
-          th.textContent = `D${d}`;
+          th.textContent = dayLabels[i] || `D${d}`;
           headRow.appendChild(th);
         });
         thead.appendChild(headRow);
@@ -638,6 +944,228 @@
           `;
           legend.appendChild(item);
         });
+    }
+
+    // ── Teacher timeline rendering ────────────────────────────────────────────
+    /*
+     * Scale: 1.6 px per minute. Chosen so a 45-min JS period is ~72px (readable)
+     * and a 30-min non-teaching period is ~48px (not cramped).
+     */
+    const TL_PX_PER_MIN = 1.6;
+
+    function renderTeacherTimeline() {
+      if (!currentTeacher || !teacherData) return;
+
+      const gridsEl = document.getElementById('grids');
+      gridsEl.innerHTML = '';
+
+      const sched = teacherData.schedules[currentTeacher.scheduleKey];
+      if (!sched) return;
+
+      const { msssPeriods, jsPeriods } = teacherData;
+      const allPeriods = [...msssPeriods, ...jsPeriods];
+      const rangeStart = Math.min(...allPeriods.map(p => p.startMin));
+      const rangeEnd   = Math.max(...allPeriods.map(p => p.endMin));
+      const totalMin   = rangeEnd - rangeStart;
+      const containerH = Math.round(totalMin * TL_PX_PER_MIN);
+
+      const guideTimes = new Set();
+      allPeriods.forEach(p => { guideTimes.add(p.startMin); guideTimes.add(p.endMin); });
+      const guides = Array.from(guideTimes).map(min => ((min - rangeStart) / totalMin * 100));
+
+      const hasMsss = !!sched.msss;
+      const hasJs   = !!sched.js;
+      /*
+       * splitBySource: when the teacher appears in both schools, each day column
+       * is split left (MSSS) / right (JS). Lessons at the same time will sit
+       * side-by-side, making scheduling conflicts immediately visible.
+       */
+      const splitBySource = hasMsss && hasJs;
+
+      const dayLabels = splitBySource
+        ? ['D1 / Mon', 'D2 / Tue', 'D3 / Wed', 'D4 / Thu', 'D5 / Fri']
+        : hasMsss
+          ? ['D1', 'D2', 'D3', 'D4', 'D5']
+          : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+      if (hasMsss) {
+        // Show one block per MSSS week, merging JS lessons into the same columns.
+        ['A', 'B'].forEach(week => {
+          const msssDay = sched.msss[currentSem]?.[week] || {};
+          // JS lessons repeat every week, so the same Mon-Fri applies to both Week A and Week B.
+          const jsDay   = hasJs ? (sched.js[currentSem]?.['single'] || {}) : {};
+
+          const dayData = {};
+          for (let d = 1; d <= 5; d++) {
+            dayData[d] = [
+              ...(msssDay[d] || []).map(l => ({ ...l, source: 'ms' })),
+              ...(jsDay[d]   || []).map(l => ({ ...l, source: 'js' }))
+            ];
+          }
+
+          gridsEl.appendChild(buildTimelineSection(
+            `Week ${week}`, dayData, dayLabels, splitBySource,
+            rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods
+          ));
+        });
+      } else {
+        // JS-only teacher: a single week block, full-width blocks.
+        const jsDay = sched.js[currentSem]?.['single'] || {};
+        const dayData = {};
+        for (let d = 1; d <= 5; d++) {
+          dayData[d] = (jsDay[d] || []).map(l => ({ ...l, source: 'js' }));
+        }
+        gridsEl.appendChild(buildTimelineSection(
+          'Schedule', dayData, dayLabels, false,
+          rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods
+        ));
+      }
+    }
+
+    /**
+     * Builds one combined timeline section (Week A or Week B).
+     * When splitBySource is true each day column is divided left=MSSS / right=JS
+     * so that overlapping blocks reveal scheduling conflicts without hiding either.
+     */
+    function buildTimelineSection(title, dayData, dayLabels, splitBySource,
+        rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods) {
+
+      const block = document.createElement('div');
+      block.className = 'week-block';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'week-title';
+      titleEl.textContent = title;
+      block.appendChild(titleEl);
+
+      const body = document.createElement('div');
+      body.className = 'timeline-body';
+
+      body.appendChild(buildPeriodStrip(jsPeriods,   rangeStart, totalMin, containerH, 'left',  'JS'));
+
+      const daysEl = document.createElement('div');
+      daysEl.className = 'tl-days';
+
+      const header = document.createElement('div');
+      header.className = 'tl-days-header';
+      dayLabels.forEach(label => {
+        const th = document.createElement('div');
+        th.className = 'th-day';
+        th.textContent = label;
+        header.appendChild(th);
+      });
+      daysEl.appendChild(header);
+
+      const colsEl = document.createElement('div');
+      colsEl.className = 'tl-cols';
+
+      DAYS.forEach(d => {
+        const lessons = dayData[d] || [];
+        const col = document.createElement('div');
+        col.className = 'tl-day-col';
+        col.style.height = containerH + 'px';
+
+        guides.forEach(pct => {
+          const line = document.createElement('div');
+          line.className = 'tl-guide';
+          line.style.top = pct + '%';
+          col.appendChild(line);
+        });
+
+        // Centre divider line — marks the MS/JS boundary when both are present.
+        if (splitBySource) {
+          const divider = document.createElement('div');
+          divider.className = 'tl-centre-divider';
+          col.appendChild(divider);
+        }
+
+        lessons.forEach(lesson => {
+          const el = document.createElement('div');
+          el.className = 'tl-block';
+          el.style.background = subjectColour(lesson.subjectShort);
+          el.style.top    = ((lesson.startMin - rangeStart) / totalMin * 100) + '%';
+          el.style.height = ((lesson.endMin - lesson.startMin) / totalMin * 100) + '%';
+
+          // In split view, constrain each block to its school's half of the column.
+          if (splitBySource) {
+            if (lesson.source === 'ms') {
+              el.style.left  = '2px';
+              el.style.right = 'calc(50% + 1px)';
+            } else {
+              el.style.left  = 'calc(50% + 1px)';
+              el.style.right = '2px';
+            }
+          }
+
+          const badgeHtml = splitBySource
+            ? `<span class="tl-source tl-source-${lesson.source}">${lesson.source === 'js' ? 'JS' : 'MS'}</span>`
+            : '';
+          const groupsHtml = lesson.groupNames.length
+            ? `<div class="tl-block-groups">${lesson.groupNames.join(', ')}</div>` : '';
+
+          el.innerHTML = `
+            <div class="tl-block-header">
+              <div class="tl-block-subject">${lesson.subjectShort}</div>
+              ${badgeHtml}
+            </div>
+            <div class="tl-block-class">${lesson.classNames}</div>
+            ${groupsHtml}
+            <div class="tl-block-room">${lesson.roomShort}</div>
+            <div class="tl-block-time">${formatTime(lesson.startMin)}–${formatTime(lesson.endMin)}</div>
+          `;
+          el.title = [
+            `[${lesson.source === 'js' ? 'JS' : 'MS'}] ${lesson.subject}`,
+            lesson.classNames,
+            lesson.groupNames.join(', '),
+            lesson.roomShort
+          ].filter(Boolean).join('\n');
+
+          col.appendChild(el);
+        });
+
+        colsEl.appendChild(col);
+      });
+
+      daysEl.appendChild(colsEl);
+      body.appendChild(daysEl);
+      body.appendChild(buildPeriodStrip(msssPeriods, rangeStart, totalMin, containerH, 'right', 'MS / SS'));
+      block.appendChild(body);
+      return block;
+    }
+
+    /**
+     * Builds a period-reference strip (left = JS, right = MS/SS).
+     * Each period is a sized card positioned by real clock time, making it easy
+     * to read across any horizontal band and compare periods between schools.
+     */
+    function buildPeriodStrip(periods, rangeStart, totalMin, containerH, side, label) {
+      const strip = document.createElement('div');
+      strip.className = `tl-period-strip ${side}`;
+
+      const header = document.createElement('div');
+      header.className = 'tl-strip-header';
+      header.textContent = label;
+      strip.appendChild(header);
+
+      const body = document.createElement('div');
+      body.className = 'tl-strip-body';
+      body.style.height = containerH + 'px';
+
+      periods.forEach(period => {
+        const card = document.createElement('div');
+        const isNonTeaching = NON_TEACHING.has(period.label);
+        card.className = 'tl-period-card ' + (isNonTeaching ? 'non-teaching' : 'teaching');
+        card.style.top    = ((period.startMin - rangeStart) / totalMin * 100) + '%';
+        card.style.height = ((period.endMin   - period.startMin) / totalMin * 100) + '%';
+        card.innerHTML = `
+          <span class="tl-pc-name">${period.short || period.label}</span>
+          <span class="tl-pc-time">${formatTime(period.startMin)}–${formatTime(period.endMin)}</span>
+        `;
+        body.appendChild(card);
+      });
+
+      strip.appendChild(body);
+      return strip;
     }
 
     init();
