@@ -19,11 +19,12 @@ There are no build steps, linting tools, or tests — this is a pure Apps Script
 
 The project is two files:
 
-**`Code.js`** — Apps Script backend. Exposes two client-callable functions:
+**`Code.js`** — Apps Script backend. Exposes three client-callable functions:
 - `getTimetableData(schedule)` — parses the MSSS or JS XML from Drive and returns a structured object containing `periods`, `travellingGroups`, `grids`, `schemaType`, `weeksMode`, and `dayLabels`.
 - `getTeacherData(forceRefresh)` — builds a unified teacher schedule across both schools. Results are cached in `CacheService` for 6 hours (the Apps Script maximum). The `clearTeacherCache()` helper busts it.
+- `getClientConfig()` — returns client-safe config values from Script Properties (`logoUrl`, `logoAlt`). Only exposes values safe to send to the browser — no folder IDs or internal paths.
 
-**`Index.html`** — A single-page frontend app with no framework dependencies. At startup, `init()` fires three `google.script.run` calls in parallel (`getTimetableData('MSSS')`, `getTimetableData('JS')`, `getTeacherData()`), storing results in the module-level `allData` object. All subsequent view switches (school, grade, week, semester) are instant client-side re-renders with no further server calls.
+**`Index.html`** — A single-page frontend app with no framework dependencies. At startup, `init()` fires four `google.script.run` calls in parallel (`getTimetableData('MSSS')`, `getTimetableData('JS')`, `getTeacherData()`, `getClientConfig()`), storing results in the module-level `allData` object. All subsequent view switches (school, grade, week, semester) are instant client-side re-renders with no further server calls.
 
 ## Two schools, two XML schemas
 
@@ -45,7 +46,8 @@ The frontend has two modes toggled by the tab bar:
 
 ## Key data-flow invariants
 
-- All deployment-specific values (`TIMETABLE_FOLDER_ID`, `MSSS_FILENAME`, `JS_FILENAME`, `FAVICON_URL`) live in Script Properties, not in code. Run `setupConfig()` once from the editor to seed placeholders, then set real values under Project Settings → Script Properties. `getConfig()` reads them at runtime and throws a descriptive error if any required property is missing.
+- All deployment-specific values (`TIMETABLE_FOLDER_ID`, `MSSS_FILENAME`, `JS_FILENAME`, `FAVICON_URL`, `LOGO_URL`, `LOGO_ALT`) live in Script Properties, not in code. Run `setupConfig()` once from the editor to seed placeholders, then set real values under Project Settings → Script Properties. `getConfig()` reads them at runtime and throws a descriptive error if any required property is missing. Optional properties (`FAVICON_URL`, `LOGO_URL`, `LOGO_ALT`) default to blank/empty gracefully.
 - XML files are never committed to this repo — update them in Drive directly.
 - The favicon is set via `setFaviconUrl()` in `doGet()` using the `FAVICON_URL` script property. It must be a direct image URL (e.g. `drive.google.com/uc?export=download`). The `<link rel="icon">` approach does not work — Apps Script strips it from the HTML output. If `FAVICON_URL` is blank, no favicon is set.
+- The school logo (`LOGO_URL`) is fetched at startup via `getClientConfig()` and applied dynamically — it is hidden until the URL is available. Both favicon and logo must use direct image URLs, not Drive viewer/thumbnail redirects.
 - `appsscript.json` sets `executeAs: USER_DEPLOYING` and `access: DOMAIN` — the app runs as the deploying account and is restricted to the domain.
