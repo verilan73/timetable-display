@@ -8,23 +8,63 @@
  *   JS   — Junior School: single-week, Mon–Fri, grades JK–5, class-based selector.
  *
  * Setup:
- *  1. Upload your timetable XMLs to the folder identified by TIMETABLE_FOLDER_ID.
- *  2. Copy this file and Index.html into a new Apps Script project.
+ *  1. Run setupConfig() once from the Apps Script editor to seed Script Properties
+ *     with placeholder values, then update them under Project Settings → Script Properties.
+ *  2. Upload your timetable XMLs to the Drive folder identified by TIMETABLE_FOLDER_ID.
  *  3. Deploy > New deployment > Web app.
  *     Execute as: Me | Who has access: Anyone in your organisation.
  */
 
-/** Name of the Middle/Senior School XML file in the timetable folder. */
-const XML_FILENAME = 'MSSS Schedule.xml';
-
-/** Name of the Junior School XML file in the timetable folder. */
-const JS_XML_FILENAME = 'JS Schedule.xml';
+// ── Configuration ─────────────────────────────────────────────────────────────
 
 /**
- * ID of the Shared Drive folder that holds the timetable XML files.
- * Extract from the folder URL: drive.google.com/drive/.../folders/<ID>
+ * Reads all deployment-specific config from Script Properties.
+ * Throws a descriptive error if any required property is missing, so
+ * misconfigured deployments fail loudly rather than silently misbehaving.
+ *
+ * Set values under Apps Script editor → Project Settings → Script Properties,
+ * or run setupConfig() once to seed placeholder values you can then edit.
+ *
+ * @returns {{ folderId: string, msssFilename: string, jsFilename: string, faviconUrl: string }}
  */
-const TIMETABLE_FOLDER_ID = '1HP8gmuAjCm8AsqxRlTaS-OI2uMlK1Z54';
+function getConfig() {
+  const props = PropertiesService.getScriptProperties();
+  const required = ['TIMETABLE_FOLDER_ID', 'MSSS_FILENAME', 'JS_FILENAME'];
+  const missing = required.filter(k => !props.getProperty(k));
+  if (missing.length) {
+    throw new Error(
+      `Missing Script Properties: ${missing.join(', ')}. ` +
+      'Run setupConfig() to seed placeholders, then set real values in Project Settings → Script Properties.'
+    );
+  }
+  return {
+    folderId:     props.getProperty('TIMETABLE_FOLDER_ID'),
+    msssFilename: props.getProperty('MSSS_FILENAME'),
+    jsFilename:   props.getProperty('JS_FILENAME'),
+    faviconUrl:   props.getProperty('FAVICON_URL') || '',
+  };
+}
+
+/**
+ * Seeds Script Properties with placeholder values so a new deployment has a
+ * starting point to edit. Safe to re-run — only sets properties that are not
+ * already present, so it will not overwrite real values.
+ *
+ * Run once from the Apps Script editor after cloning the project.
+ */
+function setupConfig() {
+  const props = PropertiesService.getScriptProperties();
+  const defaults = {
+    TIMETABLE_FOLDER_ID: 'YOUR_DRIVE_FOLDER_ID',
+    MSSS_FILENAME:       'MSSS Schedule.xml',
+    JS_FILENAME:         'JS Schedule.xml',
+    FAVICON_URL:         '',
+  };
+  Object.entries(defaults).forEach(([k, v]) => {
+    if (!props.getProperty(k)) props.setProperty(k, v);
+  });
+  Logger.log('Config seeded. Update values in Project Settings → Script Properties.');
+}
 
 /**
  * Grades (MSSS) that use the travelling-group system. Groups whose names start
@@ -52,10 +92,12 @@ const DAY_FROM_BITS = {
  * @returns {GoogleAppsScript.HTML.HtmlOutput}
  */
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setFaviconUrl('https://drive.google.com/uc?id=1Ooo1DTKif3a0QHZjd10Qn-pL7g1br1Sk&export=download&format=png')
+  const { faviconUrl } = getConfig();
+  const output = HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Timetable Viewer')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  if (faviconUrl) output.setFaviconUrl(faviconUrl);
+  return output;
 }
 
 
@@ -78,7 +120,8 @@ function doGet() {
  * }}
  */
 function getTimetableData(schedule) {
-  const filename = (schedule === 'JS') ? JS_XML_FILENAME : XML_FILENAME;
+  const { msssFilename, jsFilename } = getConfig();
+  const filename = (schedule === 'JS') ? jsFilename : msssFilename;
   const doc = loadXmlFromDrive(filename);
   return buildTimetableData(doc);
 }
@@ -95,12 +138,13 @@ function getTimetableData(schedule) {
  * @throws {Error} If the folder or file cannot be found.
  */
 function loadXmlFromDrive(filename) {
+  const { folderId } = getConfig();
   // getFolderById works with Shared Drives under the V8 runtime.
-  const folder = DriveApp.getFolderById(TIMETABLE_FOLDER_ID);
+  const folder = DriveApp.getFolderById(folderId);
   const files  = folder.getFilesByName(filename);
   if (!files.hasNext()) {
     throw new Error(
-      `"${filename}" was not found in the timetable folder (${TIMETABLE_FOLDER_ID}). ` +
+      `"${filename}" was not found in the timetable folder (${folderId}). ` +
       'Upload the XML export to that folder and ensure the filename matches.'
     );
   }

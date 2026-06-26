@@ -45,6 +45,7 @@ The frontend has two modes toggled by the tab bar:
 
 ## Key data-flow invariants
 
-- `TIMETABLE_FOLDER_ID` in `Code.js` is the only place that identifies the Shared Drive folder. XML files are never committed to this repo — update them in Drive directly.
-- The favicon is set via `setFaviconUrl()` in `doGet()` pointing to a public Drive file (`uc?export=download`). The `<link rel="icon">` approach does not work — Apps Script strips it from the HTML output.
+- All deployment-specific values (`TIMETABLE_FOLDER_ID`, `MSSS_FILENAME`, `JS_FILENAME`, `FAVICON_URL`) live in Script Properties, not in code. Run `setupConfig()` once from the editor to seed placeholders, then set real values under Project Settings → Script Properties. `getConfig()` reads them at runtime and throws a descriptive error if any required property is missing.
+- XML files are never committed to this repo — update them in Drive directly.
+- The favicon is set via `setFaviconUrl()` in `doGet()` using the `FAVICON_URL` script property. It must be a direct image URL (e.g. `drive.google.com/uc?export=download`). The `<link rel="icon">` approach does not work — Apps Script strips it from the HTML output. If `FAVICON_URL` is blank, no favicon is set.
 - `appsscript.json` sets `executeAs: USER_DEPLOYING` and `access: DOMAIN` — the app runs as the deploying account and is restricted to the domain.

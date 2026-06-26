@@ -43,14 +43,24 @@ The frontend calls the backend exclusively via `google.script.run`. All three da
 - Lesson cards show subject, class(es), group(s), room, and time range
 - Semester 1 / 2 toggle; ↻ Refresh button to bust the 6-hour server-side cache
 
-## Data files
+## Configuration
 
-Both XML files live in the Shared Drive folder identified by `TIMETABLE_FOLDER_ID` in `Code.gs`. They are excluded from this repo — update them in Drive when a new timetable export is available, then use the ↻ Refresh button in the teacher view to clear the cache.
+All deployment-specific values are stored in **Script Properties**, not in code. This means the same codebase works for any deployment without modification — each instance just has its own properties.
 
-| File | Constant in Code.gs |
+To configure a new deployment:
+
+1. Open the project in the Apps Script editor
+2. Run `setupConfig()` once from the editor — this seeds placeholder values
+3. Go to **Project Settings → Script Properties** and set the real values:
+
+| Property | Description |
 |---|---|
-| `MSSS Schedule.xml` | `XML_FILENAME` |
-| `JS Schedule.xml` | `JS_XML_FILENAME` |
+| `TIMETABLE_FOLDER_ID` | ID of the Drive folder containing the XML files (from the folder URL) |
+| `MSSS_FILENAME` | Filename of the Middle/Senior School XML (default: `MSSS Schedule.xml`) |
+| `JS_FILENAME` | Filename of the Junior School XML (default: `JS Schedule.xml`) |
+| `FAVICON_URL` | Optional — direct URL to a favicon image file. Leave blank for no favicon. |
+
+XML files are excluded from this repo — upload them to your Drive folder and keep filenames matching the properties above.
 
 ## Setup on a new machine
 
@@ -62,13 +72,16 @@ Both XML files live in the Shared Drive folder identified by `TIMETABLE_FOLDER_I
    ```
    clasp login
    ```
-3. **Clone this repo** — the `.clasp.json` already points to the correct Apps Script project.
+3. **Create a `.clasp.json`** in the project root pointing to your Apps Script project:
+   ```json
+   { "scriptId": "YOUR_SCRIPT_ID", "rootDir": "." }
+   ```
 4. **Push code** to the script editor:
    ```
    clasp push --force
    ```
-5. **Deploy** in the Apps Script UI:
-   - Open the project at `https://script.google.com`
+5. **Run `setupConfig()`** from the Apps Script editor, then set real values in Project Settings → Script Properties.
+6. **Deploy** in the Apps Script UI:
    - **Deploy → Manage deployments → Edit (pencil) → Version: New version → Deploy**
    - The deployment URL stays the same; the new version is now live.
 
@@ -79,9 +92,8 @@ Both XML files live in the Shared Drive folder identified by `TIMETABLE_FOLDER_I
 ## Project structure
 
 ```
-Code.gs          — Apps Script backend: XML parsing, grid builder, teacher schedule builder, caching
+Code.js          — Apps Script backend: XML parsing, grid builder, teacher schedule builder, caching
 Index.html       — Frontend SPA: class grid view, teacher timeline view, controls, legend
 appsscript.json  — Apps Script manifest (timezone, runtime)
-.clasp.json      — clasp config (points to the Apps Script project — not a secret, needed to push)
 ```
 
