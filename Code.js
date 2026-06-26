@@ -53,9 +53,13 @@ const DAY_FROM_BITS = {
  */
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
+    .setFaviconUrl('https://drive.google.com/uc?id=1Ooo1DTKif3a0QHZjd10Qn-pL7g1br1Sk&export=download&format=png')
     .setTitle('Timetable Viewer')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
+
+
 
 // ── Client-callable function ──────────────────────────────────────────────────
 
