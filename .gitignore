@@ -1,3 +1,6 @@
+# clasp project config — ties to a specific Apps Script deployment; set up locally.
+.clasp.json
+
 # Timetable XML lives in Google Drive — do not commit.
 # Upload to Drive and keep the filename matching XML_FILENAME in Code.gs.
 *.xml
