@@ -25,7 +25,7 @@
  * Set values under Apps Script editor → Project Settings → Script Properties,
  * or run setupConfig() once to seed placeholder values you can then edit.
  *
- * @returns {{ folderId: string, msssFilename: string, jsFilename: string, faviconUrl: string }}
+ * @returns {{ folderId: string, msssFilename: string, jsFilename: string, faviconUrl: string, logoUrl: string, logoAlt: string }}
  */
 function getConfig() {
   const props = PropertiesService.getScriptProperties();
@@ -42,7 +42,22 @@ function getConfig() {
     msssFilename: props.getProperty('MSSS_FILENAME'),
     jsFilename:   props.getProperty('JS_FILENAME'),
     faviconUrl:   props.getProperty('FAVICON_URL') || '',
+    logoUrl:      props.getProperty('LOGO_URL')    || '',
+    logoAlt:      props.getProperty('LOGO_ALT')    || 'School logo',
   };
+}
+
+/**
+ * Returns client-safe config values that the frontend needs at startup.
+ * Only exposes values safe to send to the browser — no folder IDs or internal paths.
+ *
+ * Called from the browser via google.script.run.getClientConfig().
+ *
+ * @returns {{ logoUrl: string, logoAlt: string }}
+ */
+function getClientConfig() {
+  const { logoUrl, logoAlt } = getConfig();
+  return { logoUrl, logoAlt };
 }
 
 /**
@@ -59,6 +74,8 @@ function setupConfig() {
     MSSS_FILENAME:       'MSSS Schedule.xml',
     JS_FILENAME:         'JS Schedule.xml',
     FAVICON_URL:         '',
+    LOGO_URL:            '',
+    LOGO_ALT:            'School logo',
   };
   Object.entries(defaults).forEach(([k, v]) => {
     if (!props.getProperty(k)) props.setProperty(k, v);

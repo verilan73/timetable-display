@@ -473,8 +473,7 @@
 
   <div id="app">
     <div id="controls">
-      <img src="https://drive.google.com/thumbnail?id=1wPCk9ZbXWmjhRyKnFdLyxT-_B9k_N3SS"
-           alt="Branksome Hall Asia" class="school-logo">
+      <img id="school-logo" class="school-logo" style="display:none">
       <div class="controls-divider"></div>
       <!-- View toggle — always visible -->
       <div class="control-group">
@@ -612,11 +611,18 @@
     async function init() {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         try {
-          const [msss, js, teachers] = await Promise.all([
+          const [msss, js, teachers, clientConfig] = await Promise.all([
             gsRun('getTimetableData', 'MSSS'),
             gsRun('getTimetableData', 'JS'),
-            gsRun('getTeacherData', false)
+            gsRun('getTeacherData', false),
+            gsRun('getClientConfig')
           ]);
+          if (clientConfig && clientConfig.logoUrl) {
+            const logo = document.getElementById('school-logo');
+            logo.src   = clientConfig.logoUrl;
+            logo.alt   = clientConfig.logoAlt || 'School logo';
+            logo.style.display = '';
+          }
           allData.MSSS = msss;
           allData.JS   = js;
           onTeacherDataLoaded(teachers);

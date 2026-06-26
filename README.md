@@ -58,7 +58,9 @@ To configure a new deployment:
 | `TIMETABLE_FOLDER_ID` | ID of the Drive folder containing the XML files (from the folder URL) |
 | `MSSS_FILENAME` | Filename of the Middle/Senior School XML (default: `MSSS Schedule.xml`) |
 | `JS_FILENAME` | Filename of the Junior School XML (default: `JS Schedule.xml`) |
-| `FAVICON_URL` | Optional — direct URL to a favicon image file. Leave blank for no favicon. |
+| `FAVICON_URL` | Optional — direct image URL for the browser tab favicon. Leave blank for none. |
+| `LOGO_URL` | Optional — direct image URL for the school logo shown in the toolbar. Leave blank for none. |
+| `LOGO_ALT` | Alt text for the logo (default: `School logo`). |
 
 XML files are excluded from this repo — upload them to your Drive folder and keep filenames matching the properties above.
 
