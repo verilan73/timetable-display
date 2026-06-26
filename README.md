@@ -1,6 +1,16 @@
 # Timetable Display
 
-A Google Apps Script web app that reads aSc Timetables XML exports from Google Drive and renders an interactive timetable viewer for Branksome Hall Asia.
+A Google Apps Script web app that reads aSc Timetables XML exports from Google Drive and renders an interactive timetable viewer.
+
+Displays two different scheduling structures within a single application.
+![Screenshot](images/main.png)
+
+Combines different schedule structures into a single view for teachers who teach across sections.
+![Screenshot](images/two-schedule-teacher.png)
+**This was one of the primary motivators for building this, because of the challenge of building a non-conflicting schedule. As you can see from this screenshot - that problem is still not yet resolved, but I can at least _see_ it clearly now!**
+
+Built using Claude Code, which enabled me to bring to life a concept I've had for years! A lot of the explanation below is directly Claude Code.
+
 
 ## Tech stack
 
@@ -8,10 +18,12 @@ A Google Apps Script web app that reads aSc Timetables XML exports from Google D
 |---|---|
 | Backend | Google Apps Script (`Code.gs`) |
 | Frontend | Single-page HTML/CSS/JS app (`Index.html`) |
-| Data source | Two XML files on a Shared Drive folder |
+| Data source | Two XML files on a Shared Drive folder plus a favicon logo file |
 | Hosting | Apps Script web app deployment (served via `doGet()`) |
 
 The frontend calls the backend exclusively via `google.script.run`. All three data sources (MSSS schedule, JS schedule, teacher data) are fetched in parallel at startup so every subsequent view or school switch is an instant client-side re-render.
+> [!Note]
+> It does take a while to load on run/refresh. But then it is FAST!
 
 ## Features
 
@@ -73,7 +85,3 @@ appsscript.json  — Apps Script manifest (timezone, runtime)
 .clasp.json      — clasp config (points to the Apps Script project — not a secret, needed to push)
 ```
 
-## Known pending items
-
-- Subject legend/sidebar: currently hidden in teacher view, shown in class view. No further work needed on this.
-- Possible future: embed in Google Sites via Insert → Embed → URL.
