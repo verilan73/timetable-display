@@ -74,6 +74,42 @@
     }
     select:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
 
+    .teacher-search-wrap { position: relative; }
+    #teacher-input {
+      padding: 6px 10px;
+      border: 1px solid #ccd;
+      border-radius: 6px;
+      background: white;
+      font-size: 13px;
+      color: #1a1a2e;
+      width: 180px;
+    }
+    #teacher-input:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
+    #teacher-list {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 100%;
+      max-height: 260px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid #ccd;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.12);
+      list-style: none;
+      z-index: 100;
+    }
+    #teacher-list.open { display: block; }
+    #teacher-list li {
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #teacher-list li:hover, #teacher-list li.active { background: #f0f2f5; }
+    #teacher-list li.hidden { display: none; }
+
     #btn-refresh-teachers {
       padding: 6px 10px;
       border: 1px solid #ccd;
@@ -466,12 +502,15 @@
           <select id="tg-select"></select>
         </div>
       </div>
-      <!-- Teacher-mode controls: teacher dropdown + cache-refresh button, hidden by default -->
+      <!-- Teacher-mode controls: teacher search + cache-refresh button, hidden by default -->
       <div id="teacher-controls" style="display:none">
         <div class="controls-divider"></div>
         <div class="control-group">
-          <label for="teacher-select">Teacher</label>
-          <select id="teacher-select"></select>
+          <label for="teacher-input">Teacher</label>
+          <div class="teacher-search-wrap">
+            <input id="teacher-input" type="text" placeholder="Search…" autocomplete="off">
+            <ul id="teacher-list"></ul>
+          </div>
         </div>
         <button id="btn-refresh-teachers" onclick="refreshTeacherData()"
                 title="Reload teacher data from source XML files">↻ Refresh</button>
@@ -620,23 +659,47 @@
 
     function onTeacherDataLoaded(data) {
       teacherData = data;
-      const select = document.getElementById('teacher-select');
-      select.innerHTML = '';
+      const input = document.getElementById('teacher-input');
+      const list  = document.getElementById('teacher-list');
+      list.innerHTML = '';
 
       data.teachers.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t.scheduleKey;
-        opt.textContent = t.name;
-        select.appendChild(opt);
+        const li = document.createElement('li');
+        li.dataset.key = t.scheduleKey;
+        li.textContent = t.name;
+        li.addEventListener('mousedown', () => selectTeacher(t));
+        list.appendChild(li);
       });
 
-      select.onchange = () => {
-        currentTeacher = teacherData.teachers.find(t => t.scheduleKey === select.value);
+      function selectTeacher(t) {
+        currentTeacher = t;
+        input.value = t.name;
+        list.classList.remove('open');
         renderTeacherTimeline();
-      };
+      }
+
+      function filterList() {
+        const q = input.value.trim().toLowerCase();
+        list.querySelectorAll('li').forEach(li => {
+          li.classList.toggle('hidden', q.length > 0 && !li.textContent.toLowerCase().includes(q));
+        });
+      }
+
+      input.addEventListener('focus', () => { filterList(); list.classList.add('open'); });
+      input.addEventListener('blur',  () => list.classList.remove('open'));
+      input.addEventListener('input', () => {
+        filterList();
+        list.classList.add('open');
+        // If the typed text matches exactly one visible teacher, pre-select them.
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        if (visible.length === 1) {
+          const match = data.teachers.find(t => t.scheduleKey === visible[0].dataset.key);
+          if (match) { currentTeacher = match; renderTeacherTimeline(); }
+        }
+      });
 
       currentTeacher = data.teachers[0] || null;
-      if (currentTeacher) select.value = currentTeacher.scheduleKey;
+      if (currentTeacher) input.value = currentTeacher.name;
 
       const btn = document.getElementById('btn-refresh-teachers');
       if (btn) btn.disabled = false;
