@@ -110,6 +110,19 @@
     #teacher-list li:hover, #teacher-list li.active { background: #f0f2f5; }
     #teacher-list li.hidden { display: none; }
 
+    .teacher-nav-btn {
+      padding: 6px 9px;
+      border: 1px solid #ccd;
+      border-radius: 6px;
+      background: white;
+      font-size: 13px;
+      line-height: 1;
+      color: #555;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .teacher-nav-btn:hover { background: #f0f2f5; }
+
     #btn-refresh-teachers {
       padding: 6px 10px;
       border: 1px solid #ccd;
@@ -506,10 +519,12 @@
         <div class="controls-divider"></div>
         <div class="control-group">
           <label for="teacher-input">Teacher</label>
+          <button id="teacher-prev" class="teacher-nav-btn" type="button" title="Previous teacher">‹</button>
           <div class="teacher-search-wrap">
             <input id="teacher-input" type="text" placeholder="Search…" autocomplete="off">
             <ul id="teacher-list"></ul>
           </div>
+          <button id="teacher-next" class="teacher-nav-btn" type="button" title="Next teacher">›</button>
         </div>
         <button id="btn-refresh-teachers" onclick="refreshTeacherData()"
                 title="Reload teacher data from source XML files">↻ Refresh</button>
@@ -691,7 +706,27 @@
         });
       }
 
-      input.addEventListener('focus', () => { filterList(); list.classList.add('open'); });
+      // Steps to the previous/next teacher in the (alphabetical) list, wrapping
+      // at either end so repeated clicks keep cycling through everyone.
+      function stepTeacher(delta) {
+        if (!data.teachers.length) return;
+        const idx = currentTeacher
+          ? data.teachers.findIndex(t => t.scheduleKey === currentTeacher.scheduleKey)
+          : -1;
+        const next = (idx + delta + data.teachers.length) % data.teachers.length;
+        selectTeacher(data.teachers[next]);
+      }
+      document.getElementById('teacher-prev').addEventListener('click', () => stepTeacher(-1));
+      document.getElementById('teacher-next').addEventListener('click', () => stepTeacher(1));
+
+      input.addEventListener('focus', () => {
+        // Show the full roster on focus (not just whoever is currently
+        // selected) so scanning through names doesn't require clearing the
+        // box first; select the text so typing immediately replaces it.
+        list.querySelectorAll('li').forEach(li => li.classList.remove('hidden'));
+        list.classList.add('open');
+        input.select();
+      });
       input.addEventListener('blur',  () => list.classList.remove('open'));
       input.addEventListener('input', () => {
         filterList();
