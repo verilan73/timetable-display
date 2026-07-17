@@ -137,24 +137,41 @@ function doGet() {
  * }}
  */
 function getTimetableData(schedule) {
+  const start = Date.now();
   const { msssFilename, jsFilename } = getConfig();
-  const filename = (schedule === 'JS') ? jsFilename : msssFilename;
-  const doc = loadXmlFromDrive(filename);
-  return buildTimetableData(doc);
+  const scheduleKey = (schedule === 'JS') ? 'JS' : 'MSSS';
+  const filename    = (scheduleKey === 'JS') ? jsFilename : msssFilename;
+
+  const file        = findTimetableFile(filename);
+  const fingerprint = fileFingerprint(file);
+  const cacheKey    = TIMETABLE_CACHE_KEY + '_' + scheduleKey;
+
+  const cached = getCachedJson(cacheKey, fingerprint);
+  if (cached) {
+    Logger.log(`getTimetableData(${scheduleKey}): cache hit in ${Date.now() - start}ms`);
+    return cached;
+  }
+
+  const data = buildTimetableData(loadXmlFromDrive(file));
+  putCachedJson(cacheKey, fingerprint, data);
+  Logger.log(`getTimetableData(${scheduleKey}): cache miss, rebuilt in ${Date.now() - start}ms`);
+  return data;
 }
 
 // ── XML loading ───────────────────────────────────────────────────────────────
 
 /**
- * Finds and parses a named timetable XML from the designated Shared Drive folder.
- * If multiple copies share the filename, the most recently modified wins.
+ * Locates the most recently modified Drive file matching filename within the
+ * timetable folder. Only file metadata is read here — no content is
+ * downloaded — so this is cheap enough to call on every request just to
+ * check whether a cached result is still fresh.
  *
  * @see https://developers.google.com/apps-script/reference/drive/drive-app#getFolderById(String)
  * @param {string} filename
- * @returns {GoogleAppsScript.XML_Service.Document}
+ * @returns {GoogleAppsScript.Drive.File}
  * @throws {Error} If the folder or file cannot be found.
  */
-function loadXmlFromDrive(filename) {
+function findTimetableFile(filename) {
   const { folderId } = getConfig();
   // getFolderById works with Shared Drives under the V8 runtime.
   const folder = DriveApp.getFolderById(folderId);
@@ -170,7 +187,31 @@ function loadXmlFromDrive(filename) {
     const candidate = files.next();
     if (candidate.getLastUpdated() > best.getLastUpdated()) best = candidate;
   }
-  return XmlService.parse(best.getBlob().getDataAsString('UTF-8'));
+  return best;
+}
+
+/**
+ * A fingerprint that changes whenever a Drive file's content might have
+ * changed. Used to tell whether a cached, parsed result is still valid
+ * without having to re-download and re-parse the file to check.
+ *
+ * @param {GoogleAppsScript.Drive.File} file
+ * @returns {string}
+ */
+function fileFingerprint(file) {
+  return file.getId() + '@' + file.getLastUpdated().getTime();
+}
+
+/**
+ * Downloads and parses a Drive file into an XmlService Document. This is the
+ * expensive step — network transfer plus an XML parse of a file that can run
+ * several hundred KB — which is why callers only reach it on a cache miss.
+ *
+ * @param {GoogleAppsScript.Drive.File} file
+ * @returns {GoogleAppsScript.XML_Service.Document}
+ */
+function loadXmlFromDrive(file) {
+  return XmlService.parse(file.getBlob().getDataAsString('UTF-8'));
 }
 
 // ── Data building ─────────────────────────────────────────────────────────────
@@ -678,20 +719,84 @@ function splitIds(str) {
 
 // ── Teacher view ──────────────────────────────────────────────────────────────
 
+// ── Caching ───────────────────────────────────────────────────────────────────
+// CacheService is in-memory on Google's servers and shared across all users of
+// this script — exactly what we want, since the timetable data is the same
+// for everyone regardless of who requests it. Each entry is tagged with a
+// fingerprint of its source file(s), so a request only pays the full
+// XML-parse cost when the underlying file has actually changed, not on a
+// blind timer. The per-key size limit is 100 KB, so large payloads are split
+// into numbered chunks.
+
+const TIMETABLE_CACHE_KEY = 'timetable_data_v1';
+const TEACHER_CACHE_KEY   = 'timetable_teacher_v1';
+const CACHE_CHUNK_SIZE    = 90000;  // 90 KB per chunk (leaves headroom under 100 KB limit)
+const CACHE_TTL           = 21600;  // 6 hours — a ceiling, not the normal invalidation
+                                     // path; a fingerprint mismatch invalidates sooner.
+
 /**
- * CacheService key prefix and settings for teacher data.
- * CacheService is in-memory on Google's servers and shared across all users of
- * this script, which is exactly what we want for shared timetable data.
- * The per-key limit is 100 KB, so large payloads are split into chunks.
+ * Reads a chunked, fingerprinted JSON payload from the script cache.
+ * Returns null on any kind of miss — absent, expired, partially evicted, or
+ * a fingerprint that no longer matches the current source — so callers can
+ * fall back to rebuilding from source.
+ *
+ * @param {string} key         Cache key prefix.
+ * @param {string} fingerprint Current source fingerprint to validate against.
+ * @returns {*} The cached payload, or null on a cache miss.
  */
-const TEACHER_CACHE_KEY = 'timetable_teacher_v1';
-const CACHE_CHUNK_SIZE  = 90000;  // 90 KB per chunk (leaves headroom under 100 KB limit)
-const CACHE_TTL         = 21600;  // 6 hours — the maximum CacheService TTL
+function getCachedJson(key, fingerprint) {
+  const cache = CacheService.getScriptCache();
+  const metaJson = cache.get(key + '_meta');
+  if (!metaJson) return null;
+  try {
+    const meta = JSON.parse(metaJson);
+    if (meta.fingerprint !== fingerprint) return null;
+    const parts = [];
+    for (let i = 0; i < meta.chunkCount; i++) {
+      const part = cache.get(key + '_' + i);
+      if (part === null) return null;  // a chunk expired independently — treat as a full miss
+      parts.push(part);
+    }
+    return JSON.parse(parts.join(''));
+  } catch (e) {
+    return null;  // corrupted cache entry — fall through to rebuild
+  }
+}
+
+/**
+ * Writes a JSON payload to the script cache in chunks, tagged with the
+ * fingerprint that must match on read for the entry to count as fresh.
+ *
+ * @param {string} key
+ * @param {string} fingerprint
+ * @param {*} data
+ */
+function putCachedJson(key, fingerprint, data) {
+  const cache = CacheService.getScriptCache();
+  const json = JSON.stringify(data);
+  const chunkCount = Math.ceil(json.length / CACHE_CHUNK_SIZE);
+  for (let i = 0; i < chunkCount; i++) {
+    cache.put(key + '_' + i, json.slice(i * CACHE_CHUNK_SIZE, (i + 1) * CACHE_CHUNK_SIZE), CACHE_TTL);
+  }
+  cache.put(key + '_meta', JSON.stringify({ chunkCount, fingerprint }), CACHE_TTL);
+}
+
+/**
+ * Removes all chunks and metadata for a cache key.
+ *
+ * @param {string} key
+ */
+function clearCachedJson(key) {
+  const cache = CacheService.getScriptCache();
+  cache.remove(key + '_meta');
+  for (let i = 0; i < 20; i++) cache.remove(key + '_' + i);
+}
 
 /**
  * Returns merged teacher roster and per-teacher schedules from both school XMLs.
- * Results are served from the script-level cache when available, so only the
- * first request (or a forced refresh) pays the full XML-parse cost.
+ * Results are served from the script-level cache when the source files
+ * haven't changed since the cache was built, so only the first request after
+ * an upload (or a forced refresh) pays the full XML-parse cost.
  *
  * Teachers are matched across schools in two stages:
  *  1. Email match — exact, authoritative; use this once emails are populated.
@@ -701,70 +806,60 @@ const CACHE_TTL         = 21600;  // 6 hours — the maximum CacheService TTL
  *     Note: two different people with identical names would incorrectly merge;
  *     the email key eliminates this risk once emails are filled in.
  *
- * @param {boolean} [forceRefresh=false]  Pass true to bypass the cache.
+ * @param {boolean} [forceRefresh=false]  Pass true to rebuild even if a fresh cache entry exists.
  * @returns {{teachers: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
  */
 function getTeacherData(forceRefresh) {
-  const cache = CacheService.getScriptCache();
+  const start = Date.now();
+  const { msssFilename, jsFilename } = getConfig();
+  const msssFile = findTimetableFile(msssFilename);
+  const jsFile   = findTimetableFile(jsFilename);
+  const fingerprint = fileFingerprint(msssFile) + '|' + fileFingerprint(jsFile);
 
-  // ── Cache read ────────────────────────────────────────────────────────────
   if (!forceRefresh) {
-    const metaJson = cache.get(TEACHER_CACHE_KEY + '_meta');
-    if (metaJson) {
-      try {
-        const { chunkCount } = JSON.parse(metaJson);
-        const parts = [];
-        for (let i = 0; i < chunkCount; i++) {
-          const part = cache.get(TEACHER_CACHE_KEY + '_' + i);
-          if (!part) break;   // partial eviction — fall through to rebuild
-          parts.push(part);
-        }
-        if (parts.length === chunkCount) {
-          return JSON.parse(parts.join(''));
-        }
-      } catch (e) {
-        // Corrupted cache entry — fall through to rebuild
-      }
+    const cached = getCachedJson(TEACHER_CACHE_KEY, fingerprint);
+    if (cached) {
+      Logger.log(`getTeacherData: cache hit in ${Date.now() - start}ms`);
+      return cached;
     }
   }
 
-  // ── Cache miss — build from source XMLs ───────────────────────────────────
-  const data = buildTeacherData();
-  const json = JSON.stringify(data);
-
-  const chunkCount = Math.ceil(json.length / CACHE_CHUNK_SIZE);
-  for (let i = 0; i < chunkCount; i++) {
-    cache.put(
-      TEACHER_CACHE_KEY + '_' + i,
-      json.slice(i * CACHE_CHUNK_SIZE, (i + 1) * CACHE_CHUNK_SIZE),
-      CACHE_TTL
-    );
-  }
-  cache.put(TEACHER_CACHE_KEY + '_meta', JSON.stringify({ chunkCount }), CACHE_TTL);
-
+  const data = buildTeacherData(msssFile, jsFile);
+  putCachedJson(TEACHER_CACHE_KEY, fingerprint, data);
+  Logger.log(`getTeacherData: cache miss, rebuilt in ${Date.now() - start}ms`);
   return data;
 }
 
 /**
- * Clears the cached teacher data so the next getTeacherData() call rebuilds
- * from the source XMLs. Call this after uploading updated XML files.
+ * Clears the cached teacher data, forcing the next getTeacherData() call to
+ * rebuild from source. Not required in normal use — the cache already
+ * auto-invalidates when the source XMLs change — but useful as a manual
+ * escape hatch, e.g. recovering from a corrupted cache entry.
  */
 function clearTeacherCache() {
-  const cache = CacheService.getScriptCache();
-  cache.remove(TEACHER_CACHE_KEY + '_meta');
-  for (let i = 0; i < 20; i++) cache.remove(TEACHER_CACHE_KEY + '_' + i);
+  clearCachedJson(TEACHER_CACHE_KEY);
+}
+
+/**
+ * Clears the cached timetable data for both schedules. Not required in
+ * normal use — see clearTeacherCache().
+ */
+function clearTimetableCache() {
+  clearCachedJson(TIMETABLE_CACHE_KEY + '_MSSS');
+  clearCachedJson(TIMETABLE_CACHE_KEY + '_JS');
 }
 
 /**
  * Builds the full teacher dataset by loading and parsing both XML files.
  * This is the slow path; results are cached by getTeacherData().
  *
+ * @param {GoogleAppsScript.Drive.File} msssFile
+ * @param {GoogleAppsScript.Drive.File} jsFile
  * @returns {{teachers: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
  */
-function buildTeacherData() {
-  const { msssFilename, jsFilename } = getConfig();
-  const msssDoc = loadXmlFromDrive(msssFilename);
-  const jsDoc   = loadXmlFromDrive(jsFilename);
+function buildTeacherData(msssFile, jsFile) {
+  const msssDoc = loadXmlFromDrive(msssFile);
+  const jsDoc   = loadXmlFromDrive(jsFile);
 
   const msss = parseScheduleSource(msssDoc);
   const js   = parseScheduleSource(jsDoc);
