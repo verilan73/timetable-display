@@ -44,6 +44,16 @@ The frontend has two modes toggled by the tab bar:
 - **Class view** (`renderGrid()`) — shows a week grid for a selected grade/group. MSSS grades 6–9 use the travelling-group system; grades 10–12 show whole-class views with elective splits as horizontal sub-slots.
 - **Teacher view** (`renderTeacherTimeline()`) — shows a timeline for all staff across both schools. Teachers who appear in both XMLs get a split day column (left = MSSS, right = JS) so scheduling conflicts are immediately visible. Period reference strips are positioned by real clock time via pixel offsets.
 
+## Travelling group logic — critical invariant
+
+`buildGrids()` determines whether a lesson appears in a given TG view using two flags:
+- `matchesTg` — at least one of the lesson's group IDs is in this TG's group set
+- `isShared` — none of the lesson's group IDs appear in `allTgGroupIds` (treated as whole-class)
+
+`allTgGroupIds` must **only** contain group IDs from digit-clustered TGs (e.g. TG-1, TG-2, TG-3) — **not** from BY TGs. BY TGs include all groups in their class, including cross-class elective groups like Mus, The, Dan, Vis, MusVis. If BY groups were included in `allTgGroupIds`, those elective lessons would fail both checks (`matchesTg` false because they're not in a digit TG's set; `isShared` false because they're in `allTgGroupIds` via BY) and silently disappear from all digit TG views. The fix is the `.filter(tg => !tg.id.endsWith('-BY'))` guard in `buildGrids`.
+
+When the grid-building code changes, always run `clearTimetableCache()` from the Apps Script editor — the grids are cached by XML file fingerprint and won't reflect code changes until the cache expires or is cleared.
+
 ## Key data-flow invariants
 
 - All deployment-specific values (`TIMETABLE_FOLDER_ID`, `MSSS_FILENAME`, `JS_FILENAME`, `FAVICON_URL`, `LOGO_URL`, `LOGO_ALT`) live in Script Properties, not in code. Run `setupConfig()` once from the editor to seed placeholders, then set real values under Project Settings → Script Properties. `getConfig()` reads them at runtime and throws a descriptive error if any required property is missing. Optional properties (`FAVICON_URL`, `LOGO_URL`, `LOGO_ALT`) default to blank/empty gracefully.
