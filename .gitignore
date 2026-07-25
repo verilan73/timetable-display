@@ -8,6 +8,9 @@
 # Sample files / supporting docs — keep in Drive, not the repo.
 *.pdf
 
+# Ad hoc diagnostic screenshots (often show real teacher/student names) — never commit.
+Screenshot *.png
+
 # macOS
 .DS_Store
 
