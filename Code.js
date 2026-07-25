@@ -877,33 +877,42 @@ function buildTeacherData(msssFile, jsFile) {
     return (name || '').toLowerCase().trim().replace(/\s+/g, ' ');
   }
 
+  // Email matching must be case-insensitive too — mail systems (and Google
+  // Workspace in particular) treat addresses case-insensitively, and the two
+  // XML exports have no reason to agree on casing for the same address.
+  function normaliseEmail(email) {
+    return (email || '').toLowerCase().trim();
+  }
+
   // Pass 1: register all MSSS teachers
   Object.entries(msss.teachers).forEach(([id, t]) => {
-    const key = t.email ? `e:${t.email}` : `m:${id}`;
+    const email = normaliseEmail(t.email);
+    const key = email ? `e:${email}` : `m:${id}`;
     byKey[key] = { name: t.name, email: t.email || '', msssId: id, jsId: null };
-    if (t.email) keyByEmail[t.email] = key;
+    if (email) keyByEmail[email] = key;
     keyByName[normaliseName(t.name)] = key;  // register all, not just no-email ones
   });
 
   // Pass 2: merge JS teachers — email match first, name match as fallback
   Object.entries(js.teachers).forEach(([id, t]) => {
+    const email = normaliseEmail(t.email);
     const norm = normaliseName(t.name);
     let key;
 
-    if (t.email && keyByEmail[t.email]) {
+    if (email && keyByEmail[email]) {
       // Exact email match — most reliable
-      key = keyByEmail[t.email];
+      key = keyByEmail[email];
     } else if (keyByName[norm]) {
       // Normalised name match — handles cases where one or both systems lack email
       key = keyByName[norm];
     } else {
       // No match found — create a new entry for this JS-only teacher
-      key = t.email ? `e:${t.email}` : `j:${id}`;
+      key = email ? `e:${email}` : `j:${id}`;
       byKey[key] = { name: t.name, email: t.email || '', msssId: null, jsId: null };
     }
 
     byKey[key].jsId = id;
-    if (t.email && !keyByEmail[t.email]) keyByEmail[t.email] = key;
+    if (email && !keyByEmail[email]) keyByEmail[email] = key;
     if (!keyByName[norm]) keyByName[norm] = key;
   });
 

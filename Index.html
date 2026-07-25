@@ -626,6 +626,10 @@
     let teacherFileFilter = 'all';    // 'all' | 'JS' | 'MSSS' — which source file(s) a teacher must appear in to be listed
 
     // ── Colours ───────────────────────────────────────────────────────────────
+    // Lookups are always case-insensitive (see subjectColour) — the two XML
+    // exports don't agree on capitalization for the same subject, so keys
+    // here just need to appear once in whichever casing reads naturally,
+    // not once per casing variant.
     const SUBJECT_COLOURS = {
       'SCI':'#a5d6a7','BIO':'#80c784','CHE':'#66bb6a','PHY':'#4caf50','ESS':'#81c784','Spo':'#c8e6c9',
       'MAT':'#90caf9','MATSt':'#64b5f6','MATEx':'#42a5f5','MAA':'#2196f3','MAI':'#1976d2',
@@ -633,10 +637,9 @@
       'KorLL':'#ff8a65','KorLA':'#ff7043','KAH':'#e64a19',
       'ChiLL':'#f48fb1','ChiLi':'#f06292','Chi':'#f48fb1',
       'HUM':'#ce93d8','HIS':'#ba68c8','GEO':'#ab47bc','ECO':'#9c27b0','BUS':'#7b1fa2','PSY':'#6a1b9a',
-      'Bus':'#7b1fa2','Eco':'#9c27b0','GeoHis':'#ba68c8',
-      'MUS':'#80deea','VIS':'#4dd0e1','DAN':'#26c6da','THE':'#00acc1','FILM':'#00838f','Mus':'#80deea',
+      'GeoHis':'#ba68c8',
+      'MUS':'#80deea','VIS':'#4dd0e1','DAN':'#26c6da','THE':'#00acc1','FILM':'#00838f',
       'DES':'#ffcc80','DTEC':'#ffa726','PRO':'#fb8c00','ROB':'#f57c00','DMD':'#e65100','ENT':'#ffb300',
-      'Des':'#ffcc80','Ent':'#ffb300',
       'PHE':'#b2dfdb','PHEICE':'#4db6ac','SEH':'#80cbc4',
       'TOK':'#ef9a9a','COR':'#e0e0e0','ADV':'#eeeeee','STU':'#f5f5f5','Protect':'#f5f5f5',
       'Collab Time':'#e8eaf6','CT(Hrm)':'#e8eaf6',
@@ -645,9 +648,14 @@
       'Art':'#4dd0e1','PE':'#b2dfdb',
       'Lib':'#e8eaf6','Swi':'#b2ebf2','Ska':'#b3e5fc','A':'#f5f5f5',
     };
+    const SUBJECT_COLOURS_LOWER = {};
+    Object.entries(SUBJECT_COLOURS).forEach(([short, colour]) => {
+      SUBJECT_COLOURS_LOWER[short.toLowerCase()] = colour;
+    });
 
     function subjectColour(short) {
-      if (SUBJECT_COLOURS[short]) return SUBJECT_COLOURS[short];
+      const match = SUBJECT_COLOURS_LOWER[short.toLowerCase()];
+      if (match) return match;
       let hash = 0;
       for (let i = 0; i < short.length; i++) hash = short.charCodeAt(i) + ((hash << 5) - hash);
       return `hsl(${Math.abs(hash) % 360}, 48%, 80%)`;
@@ -1005,9 +1013,12 @@
     }
 
     // ── Grid rendering ────────────────────────────────────────────────────────
+    // Lowercased so isNonTeaching() can match regardless of how a given
+    // period label happens to be capitalized in the source XML.
     const NON_TEACHING = new Set([
-      'Lunch Pt 1','Lunch Pt 2','Lunch 1','Lunch 2','Break','Reg','Registration'
+      'lunch pt 1','lunch pt 2','lunch 1','lunch 2','break','reg','registration'
     ]);
+    function isNonTeaching(label) { return NON_TEACHING.has((label || '').toLowerCase()); }
     const DAYS = [1, 2, 3, 4, 5];
 
     function densityClass(count) {
@@ -1071,7 +1082,7 @@
         periods.forEach(period => {
           const h  = rowHeight(period.durationMin);
           const tr = document.createElement('tr');
-          if (NON_TEACHING.has(period.label)) tr.classList.add('non-teaching');
+          if (isNonTeaching(period.label)) tr.classList.add('non-teaching');
 
           // Period label — height forces consistent row height across all cells
           const tdLabel = document.createElement('td');
@@ -1126,7 +1137,7 @@
                 // when there's width to spare, falling back to stacked once
                 // the cell gets too narrow — no split-count threshold needed,
                 // the wrap happens purely from the two items not fitting.
-                const teacherRoomHtml = slot.subjectShort === 'ADV'
+                const teacherRoomHtml = slot.subjectShort.toLowerCase() === 'adv'
                   ? `<div class="slot-advisory-row">
                        <div class="slot-teacher">${slot.teacher}</div>
                        <div class="slot-room">${slot.roomShort}</div>
@@ -1439,8 +1450,8 @@
 
       periods.forEach(period => {
         const card = document.createElement('div');
-        const isNonTeaching = NON_TEACHING.has(period.label);
-        card.className = 'tl-period-card ' + (isNonTeaching ? 'non-teaching' : 'teaching');
+        const nonTeaching = isNonTeaching(period.label);
+        card.className = 'tl-period-card ' + (nonTeaching ? 'non-teaching' : 'teaching');
         card.style.top    = ((period.startMin - rangeStart) / totalMin * 100) + '%';
         card.style.height = ((period.endMin   - period.startMin) / totalMin * 100) + '%';
         card.innerHTML = `

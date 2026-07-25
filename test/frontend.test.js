@@ -4,10 +4,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadFrontend } = require('./helpers/loadFrontend');
 
-const { subjectColour, formatTime, rowHeight, densityClass } = loadFrontend();
+const { subjectColour, formatTime, rowHeight, densityClass, isNonTeaching } = loadFrontend();
 
 test('subjectColour returns the mapped colour for a known subject code', () => {
   assert.equal(subjectColour('MAT'), '#90caf9');
+});
+
+test('subjectColour matches regardless of case — the two XML exports don\'t agree on casing', () => {
+  assert.equal(subjectColour('mus'), subjectColour('MUS'));
+  assert.equal(subjectColour('Mus'), subjectColour('MUS'));
+  assert.equal(subjectColour('bUs'), subjectColour('BUS'));
 });
 
 test('subjectColour falls back to a deterministic hash colour for an unknown code', () => {
@@ -15,6 +21,13 @@ test('subjectColour falls back to a deterministic hash colour for an unknown cod
   const b = subjectColour('SomeNewSubjectNeverSeenBefore');
   assert.equal(a, b, 'the same unknown code must always produce the same colour');
   assert.match(a, /^hsl\(\d+, 48%, 80%\)$/);
+});
+
+test('isNonTeaching matches period labels regardless of case', () => {
+  assert.ok(isNonTeaching('Lunch Pt 1'));
+  assert.ok(isNonTeaching('LUNCH PT 1'));
+  assert.ok(isNonTeaching('reg'));
+  assert.ok(!isNonTeaching('Period 1'));
 });
 
 test('formatTime renders minutes-from-midnight as H:MM, zero-padding minutes', () => {
