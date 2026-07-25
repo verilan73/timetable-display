@@ -42,7 +42,7 @@ The XML files have different structures and are parsed separately:
 The frontend has two modes toggled by the tab bar:
 
 - **Class view** (`renderGrid()`) — shows a week grid for a selected grade/group. MSSS grades 6–9 use the travelling-group system; grades 10–12 show whole-class views with elective splits as horizontal sub-slots.
-- **Teacher view** (`renderTeacherTimeline()`) — shows a timeline for all staff across both schools. Teachers who appear in both XMLs get a split day column (left = MSSS, right = JS) so scheduling conflicts are immediately visible. Period reference strips are positioned by real clock time via pixel offsets.
+- **Teacher view** (`renderTeacherTimeline()`) — shows a timeline for all staff across both schools. Teachers who appear in both XMLs get a split day column (left = JS, right = MSSS) so scheduling conflicts are immediately visible. Period reference strips are positioned by real clock time via pixel offsets.
 
 ## Key data-flow invariants
 

@@ -38,7 +38,7 @@ The frontend calls the backend exclusively via `google.script.run`. All three da
 
 ### Teacher view
 - Unified timeline for all staff across both schools
-- For teachers in both schools: day columns split left (MS) / right (JS), so scheduling conflicts are immediately visible
+- For teachers in both schools: day columns split left (JS) / right (MS), so scheduling conflicts are immediately visible
 - Period reference strips on each side (JS left, MS/SS right) — each period shown as a sized card positioned by real clock time, making cross-school period alignment easy to read
 - Lesson cards show subject, class(es), group(s), room, and time range
 - Semester 1 / 2 toggle; ↻ Refresh button to bust the 6-hour server-side cache

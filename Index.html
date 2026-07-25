@@ -110,7 +110,9 @@
     #teacher-list li:hover, #teacher-list li.active { background: #f0f2f5; }
     #teacher-list li.hidden { display: none; }
 
-    .teacher-nav-btn {
+    /* Shared prev/next arrow style — used to step through both the teacher
+       roster and the Group/Class list. */
+    .nav-arrow-btn {
       padding: 6px 9px;
       border: 1px solid #ccd;
       border-radius: 6px;
@@ -121,7 +123,7 @@
       cursor: pointer;
       transition: background 0.15s;
     }
-    .teacher-nav-btn:hover { background: #f0f2f5; }
+    .nav-arrow-btn:hover { background: #f0f2f5; }
 
     #btn-refresh-teachers {
       padding: 6px 10px;
@@ -234,9 +236,28 @@
     }
     .slot:last-child { border-right: none; }
 
-    .slot-subject { font-weight: 700; font-size: 11px; line-height: 1.2; color: rgba(0,0,0,0.85); }
+    /*
+     * flex-shrink:0 on every direct child of .slot matters more than it looks:
+     * .slot is a flex column, and flex's default shrink behavior squeezes
+     * children unevenly based on siblings' content length when everything
+     * doesn't fit — producing inconsistent, unpredictable rendering between
+     * cells that look identical otherwise. Disabling shrink means each child
+     * always renders at its own natural, intended size; .slot's overflow:
+     * hidden and the JS overflow-cascade below are the only things that cut
+     * content, deterministically and in priority order.
+     */
+    .slot-subject {
+      font-weight: 700;
+      font-size: 12px;
+      line-height: 1.2;
+      color: #1a1a2e;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
 
-    /* Full density: 1-2 splits */
     .slot-teacher {
       font-size: 9.5px;
       color: rgba(0,0,0,0.65);
@@ -246,29 +267,47 @@
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+      flex-shrink: 0;
     }
-    .slot-room    { font-size: 9px; color: rgba(0,0,0,0.5); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .slot-subgroups { font-size: 8.5px; color: rgba(0,0,0,0.4); margin-top: 2px; font-style: italic; line-height: 1.2; overflow: hidden; }
+    .slot-room    { font-size: 9px; color: rgba(0,0,0,0.5); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+    .slot-subgroups { font-size: 8.5px; color: rgba(0,0,0,0.4); margin-top: 2px; font-style: italic; line-height: 1.2; overflow: hidden; flex-shrink: 0; }
+
+    /*
+     * Advisory-only: teacher and room sit side-by-side when the slot is wide
+     * enough (few splits), saving the vertical space Advisory's short rows
+     * can't spare. flex-wrap falls back to stacking automatically once the
+     * slot narrows too much for both to fit on one line — no split-count
+     * threshold needed.
+     */
+    .slot-advisory-row { display: flex; flex-wrap: wrap; column-gap: 8px; margin-top: 2px; flex-shrink: 0; }
+    .slot-advisory-row .slot-teacher,
+    .slot-advisory-row .slot-room {
+      flex: 1 1 45%;
+      min-width: 60px;
+      margin-top: 0;
+    }
 
     /*
      * Density classes control what's visible as split count increases.
-     * Sub-groups are the key discriminator between splits — they're always
-     * shown when a cell is split, and are the last thing to shrink.
-     * Teacher and room are decorative by comparison and fade first.
+     * Priority order is subject > teacher > room > sub-groups: with the
+     * travelling-group structure now well-established, sub-group codes are
+     * the least essential piece of information here, so they fade first.
+     * Subject and teacher hold their 2-line clamp the longest; room goes
+     * next; only at the tightest tier do subject/teacher clamp down too.
      */
 
-    /* 3 splits: clip teacher to 1 line, hide room */
-    .slot-row.density-compact .slot-teacher { -webkit-line-clamp: 1; font-size: 9px; }
-    .slot-row.density-compact .slot-room    { display: none; }
+    /* 3 splits: drop sub-groups only */
+    .slot-row.density-compact .slot-subgroups { display: none; }
 
-    /* 4-5 splits: hide teacher and room, keep sub-groups */
-    .slot-row.density-dense .slot-teacher  { display: none; }
-    .slot-row.density-dense .slot-room     { display: none; }
+    /* 4-5 splits: also drop room */
+    .slot-row.density-dense .slot-subgroups { display: none; }
+    .slot-row.density-dense .slot-room      { display: none; }
 
-    /* 6+ splits: subject + sub-groups only, smaller text */
-    .slot-row.density-ultra .slot-teacher  { display: none; }
-    .slot-row.density-ultra .slot-room     { display: none; }
-    .slot-row.density-ultra .slot-subgroups { font-size: 8px; }
+    /* 6+ splits: clamp subject/teacher to a single line, smaller text */
+    .slot-row.density-ultra .slot-subgroups { display: none; }
+    .slot-row.density-ultra .slot-room      { display: none; }
+    .slot-row.density-ultra .slot-subject   { -webkit-line-clamp: 1; }
+    .slot-row.density-ultra .slot-teacher   { -webkit-line-clamp: 1; font-size: 9px; }
 
     /* ── Subject filter ────────────────────────────────────────────────────── */
     /*
@@ -405,13 +444,15 @@
       padding: 5px 4px;
       letter-spacing: 0.04em;
     }
+    /* Alternating header shading makes it easier to tell at a glance which day a block belongs to. */
+    .tl-days-header .th-day:nth-child(even) { background: rgba(255,255,255,0.07); }
 
     .tl-cols { display: flex; }
 
     .tl-day-col {
       flex: 1;
       position: relative;
-      border-right: 1px solid #f0f2f5;
+      border-right: 3px solid #ccd;
       min-width: 0;
     }
     .tl-day-col:last-child { border-right: none; }
@@ -437,7 +478,17 @@
     }
     .tl-block:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 1; }
     .tl-block-header  { display: flex; justify-content: space-between; align-items: flex-start; gap: 2px; }
-    .tl-block-subject { font-weight: 700; font-size: 10.5px; line-height: 1.2; color: rgba(0,0,0,0.85); flex: 1; min-width: 0; }
+    .tl-block-subject {
+      font-weight: 700;
+      font-size: 12px;
+      line-height: 1.2;
+      color: #1a1a2e;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .tl-block-class   { font-size: 9px; color: rgba(0,0,0,0.6); margin-top: 1px; line-height: 1.2; }
     .tl-block-groups  { font-size: 8.5px; color: rgba(0,0,0,0.5); font-style: italic; }
     .tl-block-room    { font-size: 8.5px; color: rgba(0,0,0,0.5); }
@@ -468,7 +519,7 @@
 
     /*
      * Centre divider drawn inside a day column when both MSSS and JS lessons
-     * share it. Blocks left of this line are MSSS; blocks right are JS.
+     * share it. Blocks left of this line are JS; blocks right are MSSS.
      */
     .tl-centre-divider {
       position: absolute;
@@ -511,20 +562,31 @@
         <div class="controls-divider"></div>
         <div class="control-group">
           <label id="tg-label" for="tg-select">Group / Class</label>
+          <button id="tg-prev" class="nav-arrow-btn" type="button" title="Previous group/class">‹</button>
           <select id="tg-select"></select>
+          <button id="tg-next" class="nav-arrow-btn" type="button" title="Next group/class">›</button>
         </div>
       </div>
-      <!-- Teacher-mode controls: teacher search + cache-refresh button, hidden by default -->
+      <!-- Teacher-mode controls: file filter + teacher search + cache-refresh button, hidden by default -->
       <div id="teacher-controls" style="display:none">
         <div class="controls-divider"></div>
         <div class="control-group">
+          <label>Show</label>
+          <div class="toggle">
+            <button id="btn-tf-all"  class="active" onclick="setTeacherFileFilter('all')">All</button>
+            <button id="btn-tf-js"                  onclick="setTeacherFileFilter('JS')">JS</button>
+            <button id="btn-tf-msss"                onclick="setTeacherFileFilter('MSSS')">MS/SS</button>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
           <label for="teacher-input">Teacher</label>
-          <button id="teacher-prev" class="teacher-nav-btn" type="button" title="Previous teacher">‹</button>
+          <button id="teacher-prev" class="nav-arrow-btn" type="button" title="Previous teacher">‹</button>
           <div class="teacher-search-wrap">
             <input id="teacher-input" type="text" placeholder="Search…" autocomplete="off">
             <ul id="teacher-list"></ul>
           </div>
-          <button id="teacher-next" class="teacher-nav-btn" type="button" title="Next teacher">›</button>
+          <button id="teacher-next" class="nav-arrow-btn" type="button" title="Next teacher">›</button>
         </div>
         <button id="btn-refresh-teachers" onclick="refreshTeacherData()"
                 title="Reload teacher data from source XML files">↻ Refresh</button>
@@ -561,6 +623,7 @@
     let teacherData     = null;
     let currentTeacher  = null;
     let currentView     = 'classes';  // 'classes' | 'teachers'
+    let teacherFileFilter = 'all';    // 'all' | 'JS' | 'MSSS' — which source file(s) a teacher must appear in to be listed
 
     // ── Colours ───────────────────────────────────────────────────────────────
     const SUBJECT_COLOURS = {
@@ -678,6 +741,55 @@
       }
     }
 
+    /**
+     * Whether a teacher belongs to the currently selected file filter.
+     * 'all' matches everyone; 'JS'/'MSSS' require a record in that file —
+     * a teacher present in both still matches either filter.
+     */
+    function teacherMatchesFilter(t) {
+      return teacherFileFilter === 'all'
+        || (teacherFileFilter === 'JS'   && !!t.jsId)
+        || (teacherFileFilter === 'MSSS' && !!t.msssId);
+    }
+
+    // Re-applies both the file filter and the typed search text to the
+    // teacher dropdown. Shared by the search box and the file-filter toggle
+    // so the two always combine consistently.
+    function applyTeacherFilters() {
+      if (!teacherData) return;
+      const input = document.getElementById('teacher-input');
+      const list  = document.getElementById('teacher-list');
+      const q = input.value.trim().toLowerCase();
+      list.querySelectorAll('li').forEach(li => {
+        const t = teacherData.teachers.find(x => x.scheduleKey === li.dataset.key);
+        const matchesText = q.length === 0 || li.textContent.toLowerCase().includes(q);
+        li.classList.toggle('hidden', !(matchesText && teacherMatchesFilter(t)));
+      });
+    }
+
+    /**
+     * Switches which source file(s) a teacher must appear in to be listed.
+     * Narrows the search dropdown and the prev/next roster; the selected
+     * teacher's timeline still shows their full combined schedule regardless.
+     */
+    function setTeacherFileFilter(mode) {
+      teacherFileFilter = mode;
+      document.getElementById('btn-tf-all').classList.toggle('active',  mode === 'all');
+      document.getElementById('btn-tf-js').classList.toggle('active',   mode === 'JS');
+      document.getElementById('btn-tf-msss').classList.toggle('active', mode === 'MSSS');
+
+      applyTeacherFilters();
+
+      // If the current teacher fell outside the new filter, fall back to the
+      // first teacher who still matches — same default used on initial load.
+      if (!currentTeacher || !teacherMatchesFilter(currentTeacher)) {
+        currentTeacher = teacherData ? teacherData.teachers.find(teacherMatchesFilter) || null : null;
+        const input = document.getElementById('teacher-input');
+        if (input) input.value = currentTeacher ? currentTeacher.name : '';
+        if (currentView === 'teachers') renderTeacherTimeline();
+      }
+    }
+
     function onTeacherDataLoaded(data) {
       teacherData = data;
       const input = document.getElementById('teacher-input');
@@ -691,6 +803,7 @@
         li.addEventListener('mousedown', () => selectTeacher(t));
         list.appendChild(li);
       });
+      applyTeacherFilters();
 
       function selectTeacher(t) {
         currentTeacher = t;
@@ -699,37 +812,36 @@
         renderTeacherTimeline();
       }
 
-      function filterList() {
-        const q = input.value.trim().toLowerCase();
-        list.querySelectorAll('li').forEach(li => {
-          li.classList.toggle('hidden', q.length > 0 && !li.textContent.toLowerCase().includes(q));
-        });
-      }
-
-      // Steps to the previous/next teacher in the (alphabetical) list, wrapping
-      // at either end so repeated clicks keep cycling through everyone.
+      // Steps to the previous/next teacher matching the current file filter
+      // (alphabetical order), wrapping at either end so repeated clicks keep
+      // cycling through everyone in that filter.
       function stepTeacher(delta) {
-        if (!data.teachers.length) return;
+        const pool = data.teachers.filter(teacherMatchesFilter);
+        if (!pool.length) return;
         const idx = currentTeacher
-          ? data.teachers.findIndex(t => t.scheduleKey === currentTeacher.scheduleKey)
+          ? pool.findIndex(t => t.scheduleKey === currentTeacher.scheduleKey)
           : -1;
-        const next = (idx + delta + data.teachers.length) % data.teachers.length;
-        selectTeacher(data.teachers[next]);
+        const next = (idx + delta + pool.length) % pool.length;
+        selectTeacher(pool[next]);
       }
       document.getElementById('teacher-prev').addEventListener('click', () => stepTeacher(-1));
       document.getElementById('teacher-next').addEventListener('click', () => stepTeacher(1));
 
       input.addEventListener('focus', () => {
-        // Show the full roster on focus (not just whoever is currently
-        // selected) so scanning through names doesn't require clearing the
-        // box first; select the text so typing immediately replaces it.
-        list.querySelectorAll('li').forEach(li => li.classList.remove('hidden'));
+        // Show the full (filtered) roster on focus, not just whoever is
+        // currently selected, so scanning through names doesn't require
+        // clearing the box first; select the text so typing immediately
+        // replaces it.
+        list.querySelectorAll('li').forEach(li => {
+          const t = data.teachers.find(x => x.scheduleKey === li.dataset.key);
+          li.classList.toggle('hidden', !teacherMatchesFilter(t));
+        });
         list.classList.add('open');
         input.select();
       });
       input.addEventListener('blur',  () => list.classList.remove('open'));
       input.addEventListener('input', () => {
-        filterList();
+        applyTeacherFilters();
         list.classList.add('open');
         // If the typed text matches exactly one visible teacher, pre-select them.
         const visible = [...list.querySelectorAll('li:not(.hidden)')];
@@ -739,7 +851,7 @@
         }
       });
 
-      currentTeacher = data.teachers[0] || null;
+      currentTeacher = data.teachers.find(teacherMatchesFilter) || null;
       if (currentTeacher) input.value = currentTeacher.name;
 
       const btn = document.getElementById('btn-refresh-teachers');
@@ -798,6 +910,22 @@
       document.getElementById('app').style.display = 'block';
       renderGrid();
     }
+
+    // Steps to the previous/next option in the Group/Class dropdown, in the
+    // same order shown on screen, wrapping at either end. The buttons are
+    // static (never recreated), so they're wired up once below rather than
+    // inside onDataLoaded, which re-runs on every school switch.
+    function stepTg(delta) {
+      const select = document.getElementById('tg-select');
+      const options = [...select.options];
+      if (!options.length) return;
+      const idx = options.findIndex(o => o.value === select.value);
+      const next = ((idx === -1 ? 0 : idx) + delta + options.length) % options.length;
+      select.value = options[next].value;
+      select.onchange();
+    }
+    document.getElementById('tg-prev').addEventListener('click', () => stepTg(-1));
+    document.getElementById('tg-next').addEventListener('click', () => stepTg(1));
 
     function onError(err) {
       document.getElementById('loading').style.display = 'none';
@@ -987,13 +1115,29 @@
                   ? `<div class="slot-subgroups">${slot.subGroupNames.join('<br>')}</div>`
                   : '';
 
-                // Sub-groups appear before teacher so they're visible even when
-                // teacher is hidden by a density class.
+                // Priority order subject > teacher > room > sub-groups — with
+                // travelling groups now well-established, sub-group codes are
+                // the least essential thing here and the first to fade.
+                //
+                // Advisory periods are brief (short row height) regardless of
+                // split count, so stacking teacher under room wastes height
+                // that a wide, lightly-split cell has plenty of. Advisory
+                // teacher+room go in a flex-wrap row instead: side-by-side
+                // when there's width to spare, falling back to stacked once
+                // the cell gets too narrow — no split-count threshold needed,
+                // the wrap happens purely from the two items not fitting.
+                const teacherRoomHtml = slot.subjectShort === 'ADV'
+                  ? `<div class="slot-advisory-row">
+                       <div class="slot-teacher">${slot.teacher}</div>
+                       <div class="slot-room">${slot.roomShort}</div>
+                     </div>`
+                  : `<div class="slot-teacher">${slot.teacher}</div>
+                     <div class="slot-room">${slot.roomShort}</div>`;
+
                 div.innerHTML = `
-                  <div class="slot-subject">${slot.subjectShort}</div>
+                  <div class="slot-subject" data-short="${slot.subjectShort}">${slot.subject}</div>
+                  ${teacherRoomHtml}
                   ${sgHtml}
-                  <div class="slot-teacher">${slot.teacher}</div>
-                  <div class="slot-room">${slot.roomShort}</div>
                 `;
                 div.title = [
                   slot.subject, slot.teacher, slot.room,
@@ -1016,6 +1160,43 @@
         block.appendChild(table);
         gridsEl.appendChild(block);
       });
+
+      // Safety net for rows that are physically too short for what a low-split
+      // cell would normally show — e.g. brief Advisory periods. Row height is
+      // driven purely by period duration (rowHeight()), not split count, so a
+      // 1-2 split cell can still overflow even though density classes never
+      // kick in for it. Fade content in the same priority order as the
+      // density tiers (sub-groups → room → clamp teacher → clamp subject)
+      // until it actually fits.
+      gridsEl.querySelectorAll('.slot').forEach(slotEl => {
+        const fits = () => slotEl.scrollHeight <= slotEl.clientHeight + 1;
+        if (fits()) return;
+
+        const subgroups = slotEl.querySelector('.slot-subgroups');
+        if (subgroups) subgroups.style.display = 'none';
+        if (fits()) return;
+
+        const room = slotEl.querySelector('.slot-room');
+        if (room) room.style.display = 'none';
+        if (fits()) return;
+
+        const teacher = slotEl.querySelector('.slot-teacher');
+        if (teacher) teacher.style.setProperty('-webkit-line-clamp', '1');
+        if (fits()) return;
+
+        const subject = slotEl.querySelector('.slot-subject');
+        if (subject) subject.style.setProperty('-webkit-line-clamp', '1');
+      });
+
+      // Full subject names are shown by default, but in narrow/heavily-split
+      // cells even a 2-line (or 1-line, at higher density) clamp can still cut
+      // a long name off mid-word. Detect that after layout (scrollHeight >
+      // clientHeight means the clamp actually truncated something) and fall
+      // back to the short code instead of showing a truncated full name.
+      // Reads are batched before writes to avoid layout thrashing.
+      const overflowing = [...gridsEl.querySelectorAll('.slot-subject')]
+        .filter(el => el.scrollHeight > el.clientHeight + 1);
+      overflowing.forEach(el => { el.textContent = el.dataset.short; });
 
       renderLegend(usedSubjects);
       applyFilter();
@@ -1081,8 +1262,9 @@
       const hasJs   = !!sched.js;
       /*
        * splitBySource: when the teacher appears in both schools, each day column
-       * is split left (MSSS) / right (JS). Lessons at the same time will sit
-       * side-by-side, making scheduling conflicts immediately visible.
+       * is split left (JS) / right (MSSS), matching the period strips on either
+       * side. Lessons at the same time will sit side-by-side, making scheduling
+       * conflicts immediately visible.
        */
       const splitBySource = hasMsss && hasJs;
 
@@ -1128,7 +1310,7 @@
 
     /**
      * Builds one combined timeline section (Week A or Week B).
-     * When splitBySource is true each day column is divided left=MSSS / right=JS
+     * When splitBySource is true each day column is divided left=JS / right=MSSS
      * so that overlapping blocks reveal scheduling conflicts without hiding either.
      */
     function buildTimelineSection(title, dayData, dayLabels, splitBySource,
@@ -1192,7 +1374,7 @@
 
           // In split view, constrain each block to its school's half of the column.
           if (splitBySource) {
-            if (lesson.source === 'ms') {
+            if (lesson.source === 'js') {
               el.style.left  = '2px';
               el.style.right = 'calc(50% + 1px)';
             } else {
@@ -1209,7 +1391,7 @@
 
           el.innerHTML = `
             <div class="tl-block-header">
-              <div class="tl-block-subject">${lesson.subjectShort}</div>
+              <div class="tl-block-subject">${lesson.subject}</div>
               ${badgeHtml}
             </div>
             <div class="tl-block-class">${lesson.classNames}</div>
