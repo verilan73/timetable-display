@@ -13,7 +13,7 @@ clasp pull           # pull remote changes back (e.g. after editing in the scrip
 
 After any `clasp pull`, check whether `Code.js` and `Code.gs` both exist. If so, remove `Code.gs` — clasp pulls as `.js` but an old `.gs` file causes a conflict on the next push.
 
-There are no build steps, linting tools, or tests — this is a pure Apps Script / browser project.
+There are no build steps or linting tools — this is a pure Apps Script / browser project. There is a Node test suite (see Testing below), but it's dev-only and never pushed to Apps Script.
 
 ## Architecture
 
@@ -30,10 +30,10 @@ The project is two files:
 
 The XML files have different structures and are parsed separately:
 
-| School | File | Constant | Schema |
+| School | File | Script Property | Schema |
 |---|---|---|---|
-| Middle / Senior School | `MSSS Schedule.xml` | `XML_FILENAME` | `detectSchema()` returns `'MSSS'` |
-| Junior School | `JS Schedule.xml` | `JS_XML_FILENAME` | `detectSchema()` returns `'JS'` |
+| Middle / Senior School | `MSSS Schedule.xml` | `MSSS_FILENAME` | `detectSchema()` returns `'MSSS'` |
+| Junior School | `JS Schedule.xml` | `JS_FILENAME` | `detectSchema()` returns `'JS'` |
 
 `schemaType` flows through from the backend into every grid-rendering decision on the frontend. JS is single-week; MSSS is A/B week rotation. JS uses `Mon–Fri` day labels; MSSS uses `D1–D5`.
 
@@ -53,6 +53,20 @@ The frontend has two modes toggled by the tab bar:
 `allTgGroupIds` must **only** contain group IDs from digit-clustered TGs (e.g. TG-1, TG-2, TG-3) — **not** from BY TGs. BY TGs include all groups in their class, including cross-class elective groups like Mus, The, Dan, Vis, MusVis. If BY groups were included in `allTgGroupIds`, those elective lessons would fail both checks (`matchesTg` false because they're not in a digit TG's set; `isShared` false because they're in `allTgGroupIds` via BY) and silently disappear from all digit TG views. The fix is the `.filter(tg => !tg.id.endsWith('-BY'))` guard in `buildGrids`.
 
 When the grid-building code changes, always run `clearTimetableCache()` from the Apps Script editor — the grids are cached by XML file fingerprint and won't reflect code changes until the cache expires or is cleared.
+
+## Testing
+
+`npm test` (or `node --test test/*.test.js`) runs a Node test suite covering the pure-logic functions in both files — no dependencies, no build step, nothing pushed to Apps Script (`.claspignore` excludes `test/`).
+
+Only functions with **zero dependency on an Apps Script or DOM service** are covered this way:
+- `Code.js`: `buildGrids`, `detectTravellingGroups`, `detectJsClasses`, `buildTeacherSchedule`, `gradeSortKey`, `inferJsGrade`
+- `Index.html`: `subjectColour`, `formatTime`, `rowHeight`, `densityClass`
+
+`test/helpers/loadCode.js` and `loadFrontend.js` load `Code.js`/`Index.html`'s `<script>` block into a Node `vm` context — the exact same source, unmodified, no build step. Two things to know if you extend these tests:
+- Top-level `const`/`let` in the loaded file aren't reachable as properties on the returned context (a `vm` quirk — only top-level `function`/`var` declarations attach). Functions still close over them correctly when called; you just can't reach in and read or set them from a test.
+- Values returned from vm-loaded functions live in a separate realm, so `assert.deepEqual` fails on structurally-identical arrays/objects with "not reference-equal". Wrap results in `toPlain()` (from `loadCode.js`) first — a JSON round-trip into this realm's plain objects.
+
+Everything else — `parsePeriods`/`parseSection`/`parseGroups`/`parseLessons`/`parseCards`/`detectSchema` (need real `XmlService`), `getConfig`/the cache functions/`loadXmlFromDrive` (need real Google services), and almost all of `Index.html`'s DOM-driven code (filtering, navigation, rendering) — isn't practically unit-testable this way. That's covered by manual `/dev` smoke-testing instead, not chased for full automation.
 
 ## Key data-flow invariants
 

@@ -1,0 +1,8 @@
+{
+  "name": "timetable-display-tests",
+  "private": true,
+  "description": "Test harness only — the app itself has no build step or dependencies.",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
