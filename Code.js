@@ -106,15 +106,28 @@ const DAY_FROM_BITS = {
  * Serves the web app HTML when accessed via the deployment URL.
  * ALLOWALL is required for embedding in Google Sites.
  *
+ * A misconfigured deployment (e.g. missing Script Properties) throws inside
+ * getConfig() — caught here so visitors see this app's own error styling
+ * instead of Apps Script's generic, unstyled default error page.
+ *
  * @returns {GoogleAppsScript.HTML.HtmlOutput}
  */
 function doGet() {
-  const { faviconUrl } = getConfig();
-  const output = HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Timetable Viewer')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  if (faviconUrl) output.setFaviconUrl(faviconUrl);
-  return output;
+  try {
+    const { faviconUrl } = getConfig();
+    const output = HtmlService.createHtmlOutputFromFile('Index')
+      .setTitle('Timetable Viewer')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    if (faviconUrl) output.setFaviconUrl(faviconUrl);
+    return output;
+  } catch (err) {
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; ' +
+      'max-width: 500px; margin: 40px auto; padding: 20px; background: #fff3f3; ' +
+      'border: 1px solid #ffcdd2; border-radius: 8px; color: #c62828;">' +
+      '<strong>Configuration error:</strong> ' + err.message + '</div>'
+    ).setTitle('Timetable Viewer — Error');
+  }
 }
 
 
@@ -243,10 +256,9 @@ function buildTimetableData(doc) {
   const cards      = parseCards(root);
 
   const travellingGroups = detectTravellingGroups(classes, allGroups, schemaType);
-  const grids = buildGrids(
-    travellingGroups, lessons, cards,
-    subjects, teachers, classrooms, allGroups, periods, weeksMode
-  );
+  const grids = buildGrids(travellingGroups, {
+    lessons, cards, subjects, teachers, classrooms, allGroups, periods, weeksMode
+  });
 
   return { periods, travellingGroups, grids, schemaType, weeksMode, dayLabels };
 }
@@ -580,24 +592,17 @@ function gradeSortKey(grade) {
  *
  * Each slot: { subject, subjectShort, teacher, room, roomShort, subGroupNames }
  *
- * @param {Array}  travellingGroups  Output of detectTravellingGroups()
- * @param {Object} lessons
- * @param {Array}  cards
- * @param {Object} subjects
- * @param {Object} teachers
- * @param {Object} classrooms
- * @param {Object} allGroups
- * @param {Array}  periods           Output of parsePeriods()
- * @param {string} weeksMode         'AB' | 'single'
+ * @param {Array} travellingGroups  Output of detectTravellingGroups()
+ * @param {{
+ *   lessons: Object, cards: Array, subjects: Object, teachers: Object,
+ *   classrooms: Object, allGroups: Object, periods: Array, weeksMode: string
+ * }} source
  * @returns {Object}
  */
-function buildGrids(travellingGroups, lessons, cards, subjects, teachers, classrooms, allGroups, periods, weeksMode) {
+function buildGrids(travellingGroups, source) {
+  const { lessons, cards, subjects, teachers, classrooms, allGroups, periods, weeksMode } = source;
 
-  // For the 'AB' mode the weekBit is the actual MSSS bit-pattern; for 'single' we
-  // use '11' (universal) which matches all cards after the normalisation in parseCards.
-  const weekEntries = weeksMode === 'AB'
-    ? [['A', '10'], ['B', '01']]
-    : [['single', '11']];
+  const weekEntries = weekEntriesFor(weeksMode);
 
   // Only digit-clustered TGs feed the shared-lesson detection set — not BY TGs.
   // BY groups include Arts/elective groups (Mus, The, Dan, Vis, MusVis) alongside
@@ -634,10 +639,7 @@ function buildGrids(travellingGroups, lessons, cards, subjects, teachers, classr
         }
 
         cards.forEach(card => {
-          // The weekBit for 'single' is '11'; after parseCards normalisation,
-          // all JS cards also carry '11', so they always match.
-          if (card.weeks !== weekBit && card.weeks !== '11') return;
-          if (card.terms !== termBit && card.terms !== '11') return;
+          if (!cardMatchesWeekTerm(card, weekBit, termBit)) return;
 
           const day = DAY_FROM_BITS[card.days];
           if (!day) return;
@@ -719,6 +721,37 @@ function attrVal(el, name) {
  */
 function splitIds(str) {
   return str ? str.split(',').filter(Boolean) : [];
+}
+
+/**
+ * Returns the [weekKey, weekBit] pairs for a schema's week rotation, shared
+ * by buildGrids() and buildTeacherSchedule() so the two can't drift apart.
+ * 'AB' (MSSS) alternates Week A / Week B; 'single' (JS) has one week, using
+ * bit '11' — the wildcard cardMatchesWeekTerm() always matches.
+ *
+ * @param {string} weeksMode  'AB' | 'single'
+ * @returns {Array<[string, string]>}
+ */
+function weekEntriesFor(weeksMode) {
+  return weeksMode === 'AB'
+    ? [['A', '10'], ['B', '01']]
+    : [['single', '11']];
+}
+
+/**
+ * Whether a card belongs to the given week/term bit combination. A card's
+ * weeks/terms field of '11' is a wildcard — used by JS's single-week schema
+ * after the normalisation in parseCards() — and always matches.
+ *
+ * @param {Object} card
+ * @param {string} weekBit
+ * @param {string} termBit
+ * @returns {boolean}
+ */
+function cardMatchesWeekTerm(card, weekBit, termBit) {
+  if (card.weeks !== weekBit && card.weeks !== '11') return false;
+  if (card.terms !== termBit && card.terms !== '11') return false;
+  return true;
 }
 
 // ── Teacher view ──────────────────────────────────────────────────────────────
@@ -969,9 +1002,7 @@ function parseScheduleSource(doc) {
  * @returns {Object}
  */
 function buildTeacherSchedule(teacherId, source) {
-  const weekEntries = source.weeksMode === 'AB'
-    ? [['A', '10'], ['B', '01']]
-    : [['single', '11']];
+  const weekEntries = weekEntriesFor(source.weeksMode);
 
   const schedule = {};
 
@@ -984,8 +1015,7 @@ function buildTeacherSchedule(teacherId, source) {
       for (let day = 1; day <= 5; day++) schedule[semester][week][day] = [];
 
       source.cards.forEach(card => {
-        if (card.weeks !== weekBit && card.weeks !== '11') return;
-        if (card.terms !== termBit && card.terms !== '11') return;
+        if (!cardMatchesWeekTerm(card, weekBit, termBit)) return;
 
         const day = DAY_FROM_BITS[card.days];
         if (!day) return;

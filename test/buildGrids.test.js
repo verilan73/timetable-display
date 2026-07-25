@@ -6,8 +6,8 @@ const { loadCode, toPlain } = require('./helpers/loadCode');
 
 const code = loadCode();
 /** Runs buildGrids and returns a plain (this-realm) copy of the result. */
-function buildGrids(...args) {
-  return toPlain(code.buildGrids(...args));
+function buildGrids(travellingGroups, source) {
+  return toPlain(code.buildGrids(travellingGroups, source));
 }
 
 /**
@@ -19,6 +19,10 @@ function buildGrids(...args) {
  * One lesson (Music) belongs only to the elective group "Mus", never to a
  * digit group directly, and should still show up in every digit TG's view
  * because it's shared across the whole grade.
+ *
+ * Returns { travellingGroups, source } — source already matches buildGrids'
+ * second-argument shape, so a test can pass it straight through, or spread
+ * it with overrides (e.g. { ...f.source, cards: [...] }).
  */
 function buildFixture() {
   const travellingGroups = [
@@ -47,7 +51,8 @@ function buildFixture() {
   };
   const periods = [{ period: 1, label: 'Period 1', short: 'P1', startMin: 480, endMin: 520, durationMin: 40 }];
 
-  return { travellingGroups, lessons, cards, subjects, teachers, classrooms, allGroups, periods };
+  const source = { lessons, cards, subjects, teachers, classrooms, allGroups, periods, weeksMode: 'AB' };
+  return { travellingGroups, source };
 }
 
 function subjectsIn(slots) {
@@ -56,10 +61,7 @@ function subjectsIn(slots) {
 
 test('shared elective lessons (BY-only groups) appear in every digit TG view', () => {
   const f = buildFixture();
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'AB'
-  );
+  const grids = buildGrids(f.travellingGroups, f.source);
 
   const tg1Slots = grids['9G-1'].S1.A[1][1];
   const tg2Slots = grids['9G-2'].S1.A[1][1];
@@ -72,10 +74,7 @@ test('shared elective lessons (BY-only groups) appear in every digit TG view', (
 
 test('the BY view itself sees every lesson in the class', () => {
   const f = buildFixture();
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'AB'
-  );
+  const grids = buildGrids(f.travellingGroups, f.source);
 
   const bySlots = grids['9G-BY'].S1.A[1][1];
   assert.deepEqual(subjectsIn(bySlots), ['MAT', 'MUS']);
@@ -83,10 +82,7 @@ test('the BY view itself sees every lesson in the class', () => {
 
 test('a lesson tied to one digit group only appears in that group\'s own view, not the other digit group', () => {
   const f = buildFixture();
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'AB'
-  );
+  const grids = buildGrids(f.travellingGroups, f.source);
 
   const tg2Slots = grids['9G-2'].S1.A[1][1];
   assert.ok(!subjectsIn(tg2Slots).includes('MAT'),
@@ -97,24 +93,19 @@ test('class-view groups (grades 10-12) include every lesson for the class, not j
   const f = buildFixture();
   f.travellingGroups.push({ id: 'C9-CLASS', classId: 'C9', groupIds: ['9-1', '9-2', 'Mus'], viewType: 'class' });
 
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'AB'
-  );
+  const grids = buildGrids(f.travellingGroups, f.source);
 
   assert.deepEqual(subjectsIn(grids['C9-CLASS'].S1.A[1][1]), ['MAT', 'MUS']);
 });
 
 test('week and term bit-matching: a Week-A-only, Semester-1-only card does not appear in Week B or Semester 2', () => {
   const f = buildFixture();
-  f.cards = [
-    { lessonId: 'L-MAT', period: 1, days: '10000', weeks: '10', terms: '10', classroomIds: [] },
-  ];
+  const source = {
+    ...f.source,
+    cards: [{ lessonId: 'L-MAT', period: 1, days: '10000', weeks: '10', terms: '10', classroomIds: [] }],
+  };
 
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'AB'
-  );
+  const grids = buildGrids(f.travellingGroups, source);
 
   assert.deepEqual(subjectsIn(grids['9G-1'].S1.A[1][1]), ['MAT'], 'present in S1 / Week A');
   assert.deepEqual(subjectsIn(grids['9G-1'].S1.B[1][1]), [], 'absent from Week B');
@@ -124,14 +115,13 @@ test('week and term bit-matching: a Week-A-only, Semester-1-only card does not a
 test('JS-style single-week schedules: a card carrying the normalised "11" week/term bits matches every week/semester slot', () => {
   const f = buildFixture();
   // parseCards() normalises JS's weeks="1" to "11" before buildGrids ever sees it.
-  f.cards = [
-    { lessonId: 'L-MAT', period: 1, days: '10000', weeks: '11', terms: '11', classroomIds: [] },
-  ];
+  const source = {
+    ...f.source,
+    weeksMode: 'single',
+    cards: [{ lessonId: 'L-MAT', period: 1, days: '10000', weeks: '11', terms: '11', classroomIds: [] }],
+  };
 
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'single'
-  );
+  const grids = buildGrids(f.travellingGroups, source);
 
   assert.deepEqual(subjectsIn(grids['9G-1'].S1.single[1][1]), ['MAT']);
   assert.deepEqual(subjectsIn(grids['9G-1'].S2.single[1][1]), ['MAT']);
@@ -139,12 +129,9 @@ test('JS-style single-week schedules: a card carrying the normalised "11" week/t
 
 test('"entire class" groups are suppressed from sub-group names (they add no information alone)', () => {
   const f = buildFixture();
-  f.allGroups['9-1'].entireClass = true;
+  f.source.allGroups['9-1'].entireClass = true;
 
-  const grids = buildGrids(
-    f.travellingGroups, f.lessons, f.cards,
-    f.subjects, f.teachers, f.classrooms, f.allGroups, f.periods, 'AB'
-  );
+  const grids = buildGrids(f.travellingGroups, f.source);
 
   const matSlot = grids['9G-1'].S1.A[1][1].find(s => s.subjectShort === 'MAT');
   assert.deepEqual(matSlot.subGroupNames, []);

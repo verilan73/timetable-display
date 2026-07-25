@@ -695,33 +695,29 @@
      * subsequent view or school switch is an instant client-side re-render.
      */
     async function init() {
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        try {
-          const [msss, js, teachers, clientConfig] = await Promise.all([
-            gsRun('getTimetableData', 'MSSS'),
-            gsRun('getTimetableData', 'JS'),
-            gsRun('getTeacherData', false),
-            gsRun('getClientConfig')
-          ]);
-          if (clientConfig && clientConfig.logoUrl) {
-            const logo = document.getElementById('school-logo');
-            logo.src   = clientConfig.logoUrl;
-            logo.alt   = clientConfig.logoAlt || 'School logo';
-            logo.style.display = '';
-          }
-          allData.MSSS = msss;
-          allData.JS   = js;
-          onTeacherDataLoaded(teachers);
-          onDataLoaded(msss);
-        } catch (err) {
-          onError(err);
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        onError({ message: 'Not running inside Apps Script.' });
+        return;
+      }
+      try {
+        const [msss, js, teachers, clientConfig] = await Promise.all([
+          gsRun('getTimetableData', 'MSSS'),
+          gsRun('getTimetableData', 'JS'),
+          gsRun('getTeacherData', false),
+          gsRun('getClientConfig')
+        ]);
+        if (clientConfig && clientConfig.logoUrl) {
+          const logo = document.getElementById('school-logo');
+          logo.src   = clientConfig.logoUrl;
+          logo.alt   = clientConfig.logoAlt || 'School logo';
+          logo.style.display = '';
         }
-      } else if (window.__MOCK_DATA__) {
-        allData.MSSS = window.__MOCK_DATA__;
-        allData.JS   = window.__MOCK_DATA__;
-        onDataLoaded(window.__MOCK_DATA__);
-      } else {
-        onError({ message: 'Not running inside Apps Script and no mock data found.' });
+        allData.MSSS = msss;
+        allData.JS   = js;
+        onTeacherDataLoaded(teachers);
+        onDataLoaded(msss);
+      } catch (err) {
+        onError(err);
       }
     }
 
