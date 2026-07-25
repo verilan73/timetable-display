@@ -599,12 +599,16 @@ function buildGrids(travellingGroups, lessons, cards, subjects, teachers, classr
     ? [['A', '10'], ['B', '01']]
     : [['single', '11']];
 
-  // Only TG-mode groups feed the shared-lesson detection set.
-  // Class-view groups (MSSS 10–12 and all JS classes) are excluded so their
+  // Only digit-clustered TGs feed the shared-lesson detection set — not BY TGs.
+  // BY groups include Arts/elective groups (Mus, The, Dan, Vis, MusVis) alongside
+  // digit groups; including them here would mark Arts lessons as TG-exclusive and
+  // cause them to be dropped from digit-TG views. Excluding BY means non-digit
+  // groups fall outside this set, so isShared=true and they appear in all TG views.
+  // Class-view groups (MSSS 10–12 and all JS classes) are also excluded so their
   // lessons aren't accidentally shown in grades 6–9 TG views.
   const allTgGroupIds = new Set(
     travellingGroups
-      .filter(tg => tg.viewType === 'tg')
+      .filter(tg => tg.viewType === 'tg' && !tg.id.endsWith('-BY'))
       .flatMap(tg => tg.groupIds)
   );
 
