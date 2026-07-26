@@ -16,18 +16,21 @@ Built using Claude Code, which enabled me to bring to life a concept I've had fo
 
 | Layer | Technology |
 |---|---|
-| Backend | Google Apps Script (`Code.gs`) |
+| Backend | Google Apps Script (`Code.js`) |
 | Frontend | Single-page HTML/CSS/JS app (`Index.html`) |
 | Data source | Two XML files on a Shared Drive folder plus a favicon logo file |
 | Hosting | Apps Script web app deployment (served via `doGet()`) |
+| Tests | Node's built-in test runner (`npm test`) — dev-only, never deployed |
 
-The frontend calls the backend exclusively via `google.script.run`. All three data sources (MSSS schedule, JS schedule, teacher data) are fetched in parallel at startup so every subsequent view or school switch is an instant client-side re-render.
+The frontend calls the backend exclusively via `google.script.run`. All five data sources (MSSS schedule, JS schedule, teacher/subject/room data) are fetched in parallel at startup so every subsequent view or school switch is an instant client-side re-render.
 > [!Note]
 > It does take a while to load on run/refresh. But then it is FAST!
 
 ## Features
 
-### Class view
+Four views, switchable from the always-visible top bar (which stays pinned in place as you scroll):
+
+### Classes
 - **MS / SS school** (MSSS Schedule.xml): Grades 6–12
   - Grades 6–9: travelling-group selector (BY groups and digit-clustered TGs)
   - Grades 10–12: whole-class view with simultaneous elective splits shown as horizontal sub-slots
@@ -35,13 +38,17 @@ The frontend calls the backend exclusively via `google.script.run`. All three da
 - **Junior School** (JS Schedule.xml): JK / SK / Grades 1–5
   - Class-based selector, single-week schema
 - Subject legend sidebar with click-to-highlight multi-select filter
+- Prev/next arrows to step through the Group/Class list without touching the dropdown
 
-### Teacher view
-- Unified timeline for all staff across both schools
-- For teachers in both schools: day columns split left (JS) / right (MS), so scheduling conflicts are immediately visible
-- Period reference strips on each side (JS left, MS/SS right) — each period shown as a sized card positioned by real clock time, making cross-school period alignment easy to read
-- Lesson cards show subject, class(es), group(s), room, and time range
-- Semester 1 / 2 toggle; ↻ Refresh button to bust the 6-hour server-side cache
+### Teachers, Subjects, Rooms
+Three parallel timeline views, each built the same way — pick one from a searchable dropdown (with prev/next arrows and an All / JS / MS-SS filter), see its full weekly schedule:
+- **Teachers** — every staff member's timeline across both schools
+- **Subjects** — every occurrence of a subject across whichever teachers and classes teach it
+- **Rooms** — everything booked into a given classroom
+
+An entity taught/booked at both schools gets a split day column (left = JS, right = MS/SS) so scheduling conflicts are immediately visible; period reference strips on each side position every period by real clock time for easy cross-school comparison. Concurrent same-time sessions (e.g. Advisory, where every homeroom meets at once under a different teacher) collapse into a single "N sessions" card — click it to see the full list rather than a pile of hidden, overlapping blocks.
+
+Semester 1 / 2 toggle and a ↻ Refresh button (busts the 6-hour server-side cache) apply throughout.
 
 ## Configuration
 
@@ -94,8 +101,13 @@ XML files are excluded from this repo — upload them to your Drive folder and k
 ## Project structure
 
 ```
-Code.js          — Apps Script backend: XML parsing, grid builder, teacher schedule builder, caching
-Index.html       — Frontend SPA: class grid view, teacher timeline view, controls, legend
+Code.js          — Apps Script backend: XML parsing, grid builder, teacher/subject/room schedule builders, caching
+Index.html       — Frontend SPA: class grid view, teacher/subject/room timeline views, controls, legend
 appsscript.json  — Apps Script manifest (timezone, runtime)
+test/            — Node test suite (npm test) — dev-only, .claspignore excludes it from deployment
 ```
+
+## Testing
+
+`npm test` runs a dependency-free Node test suite over the pure-logic parts of both files — no build step, and nothing here is ever pushed to Apps Script. See `CLAUDE.md` for what's covered and why the rest (anything touching `XmlService`, Drive, or the DOM) is verified by hand on `/dev` instead.
 

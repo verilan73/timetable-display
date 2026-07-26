@@ -57,6 +57,12 @@
       gap: 16px;
       margin-bottom: 16px;
       flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: #f0f2f5;
+      padding: 12px 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
     }
     .school-logo { height: 44px; width: auto; flex-shrink: 0; }
     .controls-divider { width: 1px; height: 32px; background: #ccd; flex-shrink: 0; }
@@ -74,8 +80,11 @@
     }
     select:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
 
-    .teacher-search-wrap { position: relative; }
-    #teacher-input {
+    /* Shared searchable-dropdown style — used by the Teacher, Subject, and
+       Room views' search boxes. Each still has its own ID for JS targeting;
+       only the styling is shared. */
+    .entity-search-wrap { position: relative; }
+    .entity-search-input {
       padding: 6px 10px;
       border: 1px solid #ccd;
       border-radius: 6px;
@@ -84,8 +93,8 @@
       color: #1a1a2e;
       width: 180px;
     }
-    #teacher-input:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
-    #teacher-list {
+    .entity-search-input:focus { outline: 2px solid #8b1a4a; outline-offset: 1px; }
+    .entity-search-list {
       display: none;
       position: absolute;
       top: calc(100% + 4px);
@@ -100,15 +109,15 @@
       list-style: none;
       z-index: 100;
     }
-    #teacher-list.open { display: block; }
-    #teacher-list li {
+    .entity-search-list.open { display: block; }
+    .entity-search-list li {
       padding: 7px 12px;
       font-size: 13px;
       cursor: pointer;
       white-space: nowrap;
     }
-    #teacher-list li:hover, #teacher-list li.active { background: #f0f2f5; }
-    #teacher-list li.hidden { display: none; }
+    .entity-search-list li:hover, .entity-search-list li.active { background: #f0f2f5; }
+    .entity-search-list li.hidden { display: none; }
 
     /* Shared prev/next arrow style — used to step through both the teacher
        roster and the Group/Class list. */
@@ -328,8 +337,9 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.08);
       padding: 10px;
       position: sticky;
-      top: 16px;
-      max-height: calc(100vh - 80px);
+      /* Sits below the now-sticky #controls bar (~68px) rather than under it. */
+      top: 84px;
+      max-height: calc(100vh - 100px);
       overflow-y: auto;
     }
     #legend-title {
@@ -477,6 +487,18 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
     .tl-block:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 1; }
+    /*
+     * A stack of many concurrent sessions (e.g. every Advisory homeroom at
+     * once) — deliberately layered box-shadow makes the "there's more here"
+     * signal obvious rather than looking like a rendering glitch, and it's
+     * clickable through to the full list (see showLessonStack()).
+     */
+    .tl-block-stacked {
+      cursor: pointer;
+      box-shadow: 0 1px 0 2px rgba(0,0,0,0.06), 0 2px 0 4px rgba(0,0,0,0.05), 0 3px 6px rgba(0,0,0,0.18);
+    }
+    .tl-block-stacked:hover { box-shadow: 0 1px 0 2px rgba(0,0,0,0.08), 0 2px 0 4px rgba(0,0,0,0.07), 0 4px 10px rgba(0,0,0,0.25); }
+    .tl-block-stacked .tl-block-class { font-style: italic; }
     .tl-block-header  { display: flex; justify-content: space-between; align-items: flex-start; gap: 2px; }
     .tl-block-subject {
       font-weight: 700;
@@ -528,6 +550,60 @@
       background: rgba(0,0,0,0.1);
       pointer-events: none;
     }
+
+    /* ── Lesson-stack modal ────────────────────────────────────────────────── */
+    /* Shown when a stacked timeline card (see .tl-block-stacked) is clicked. */
+    #lesson-stack-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    #lesson-stack-modal.open { display: flex; }
+    .modal-panel {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+      width: 420px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #1a1a2e;
+      color: white;
+      border-radius: 10px 10px 0 0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .modal-header button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+      padding: 2px 6px;
+      line-height: 1;
+    }
+    .modal-header button:hover { opacity: 0.7; }
+    .modal-body { overflow-y: auto; padding: 10px; }
+    .lesson-stack-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      background: #f7f8fa;
+      border-left: 3px solid #8b1a4a;
+    }
+    .lesson-stack-item:last-child { margin-bottom: 0; }
+    .lesson-stack-item-header { font-weight: 700; font-size: 12.5px; color: #1a1a2e; }
+    .lesson-stack-item-detail { font-size: 11px; color: rgba(0,0,0,0.75); margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -545,6 +621,8 @@
         <div class="toggle">
           <button id="btn-view-classes"  class="active" onclick="setView('classes')">Classes</button>
           <button id="btn-view-teachers"                onclick="setView('teachers')">Teachers</button>
+          <button id="btn-view-subjects"                onclick="setView('subjects')">Subjects</button>
+          <button id="btn-view-rooms"                   onclick="setView('rooms')">Rooms</button>
         </div>
       </div>
       <!-- Class-mode controls: school selector + group/class dropdown.
@@ -582,14 +660,62 @@
         <div class="control-group">
           <label for="teacher-input">Teacher</label>
           <button id="teacher-prev" class="nav-arrow-btn" type="button" title="Previous teacher">‹</button>
-          <div class="teacher-search-wrap">
-            <input id="teacher-input" type="text" placeholder="Search…" autocomplete="off">
-            <ul id="teacher-list"></ul>
+          <div class="entity-search-wrap">
+            <input id="teacher-input" class="entity-search-input" type="text" placeholder="Search…" autocomplete="off">
+            <ul id="teacher-list" class="entity-search-list"></ul>
           </div>
           <button id="teacher-next" class="nav-arrow-btn" type="button" title="Next teacher">›</button>
         </div>
         <button id="btn-refresh-teachers" onclick="refreshTeacherData()"
                 title="Reload teacher data from source XML files">↻ Refresh</button>
+      </div>
+      <!-- Subject-mode controls: file filter + subject search + cache-refresh button, hidden by default -->
+      <div id="subject-controls" style="display:none">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Show</label>
+          <div class="toggle">
+            <button id="btn-sf-all"  class="active" onclick="setSubjectFileFilter('all')">All</button>
+            <button id="btn-sf-js"                  onclick="setSubjectFileFilter('JS')">JS</button>
+            <button id="btn-sf-msss"                onclick="setSubjectFileFilter('MSSS')">MS/SS</button>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label for="subject-input">Subject</label>
+          <button id="subject-prev" class="nav-arrow-btn" type="button" title="Previous subject">‹</button>
+          <div class="entity-search-wrap">
+            <input id="subject-input" class="entity-search-input" type="text" placeholder="Search…" autocomplete="off">
+            <ul id="subject-list" class="entity-search-list"></ul>
+          </div>
+          <button id="subject-next" class="nav-arrow-btn" type="button" title="Next subject">›</button>
+        </div>
+        <button id="btn-refresh-subjects" onclick="refreshSubjectData()"
+                title="Reload subject data from source XML files">↻ Refresh</button>
+      </div>
+      <!-- Room-mode controls: file filter + room search + cache-refresh button, hidden by default -->
+      <div id="room-controls" style="display:none">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Show</label>
+          <div class="toggle">
+            <button id="btn-rf-all"  class="active" onclick="setRoomFileFilter('all')">All</button>
+            <button id="btn-rf-js"                  onclick="setRoomFileFilter('JS')">JS</button>
+            <button id="btn-rf-msss"                onclick="setRoomFileFilter('MSSS')">MS/SS</button>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label for="room-input">Room</label>
+          <button id="room-prev" class="nav-arrow-btn" type="button" title="Previous room">‹</button>
+          <div class="entity-search-wrap">
+            <input id="room-input" class="entity-search-input" type="text" placeholder="Search…" autocomplete="off">
+            <ul id="room-list" class="entity-search-list"></ul>
+          </div>
+          <button id="room-next" class="nav-arrow-btn" type="button" title="Next room">›</button>
+        </div>
+        <button id="btn-refresh-rooms" onclick="refreshRoomData()"
+                title="Reload room data from source XML files">↻ Refresh</button>
       </div>
       <!-- Semester toggle — always visible -->
       <div class="control-group">
@@ -611,6 +737,18 @@
     </div>
   </div>
 
+  <!-- Shown when a stacked timeline card (many concurrent sessions, e.g.
+       Advisory) is clicked — see showLessonStack(). -->
+  <div id="lesson-stack-modal" onclick="if (event.target === this) closeLessonStack()">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span id="lesson-stack-title"></span>
+        <button onclick="closeLessonStack()" title="Close">✕</button>
+      </div>
+      <div id="lesson-stack-body" class="modal-body"></div>
+    </div>
+  </div>
+
   <script>
     // ── State ─────────────────────────────────────────────────────────────────
     const allData       = { MSSS: null, JS: null };  // both schools loaded at startup
@@ -622,8 +760,16 @@
 
     let teacherData     = null;
     let currentTeacher  = null;
-    let currentView     = 'classes';  // 'classes' | 'teachers'
+    let currentView     = 'classes';  // 'classes' | 'teachers' | 'subjects' | 'rooms'
     let teacherFileFilter = 'all';    // 'all' | 'JS' | 'MSSS' — which source file(s) a teacher must appear in to be listed
+
+    let subjectData      = null;
+    let currentSubject   = null;
+    let subjectFileFilter = 'all';   // 'all' | 'JS' | 'MSSS'
+
+    let roomData      = null;
+    let currentRoom   = null;
+    let roomFileFilter = 'all';      // 'all' | 'JS' | 'MSSS' — checked against each room's single source school
 
     // ── Colours ───────────────────────────────────────────────────────────────
     // Lookups are always case-insensitive (see subjectColour) — the two XML
@@ -700,10 +846,12 @@
         return;
       }
       try {
-        const [msss, js, teachers, clientConfig] = await Promise.all([
+        const [msss, js, teachers, subjects, rooms, clientConfig] = await Promise.all([
           gsRun('getTimetableData', 'MSSS'),
           gsRun('getTimetableData', 'JS'),
           gsRun('getTeacherData', false),
+          gsRun('getSubjectData', false),
+          gsRun('getRoomData', false),
           gsRun('getClientConfig')
         ]);
         if (clientConfig && clientConfig.logoUrl) {
@@ -715,6 +863,8 @@
         allData.MSSS = msss;
         allData.JS   = js;
         onTeacherDataLoaded(teachers);
+        onSubjectDataLoaded(subjects);
+        onRoomDataLoaded(rooms);
         onDataLoaded(msss);
       } catch (err) {
         onError(err);
@@ -865,6 +1015,260 @@
       if (currentView === 'teachers') renderTeacherTimeline();
     }
 
+    /** Forces a cache-busting reload of subject data from the source XMLs. */
+    async function refreshSubjectData() {
+      const btn = document.getElementById('btn-refresh-subjects');
+      if (btn) btn.disabled = true;
+      document.getElementById('grids').innerHTML =
+        `<div class="loading-inline"><div class="spinner"></div>Refreshing subject data…</div>`;
+      try {
+        const data = await gsRun('getSubjectData', true);
+        onSubjectDataLoaded(data);
+      } catch (err) {
+        onError(err);
+      }
+    }
+
+    /**
+     * Whether a subject belongs to the currently selected file filter.
+     * 'all' matches everyone; 'JS'/'MSSS' require a record in that file —
+     * a subject taught at both schools still matches either filter.
+     */
+    function subjectMatchesFilter(s) {
+      return subjectFileFilter === 'all'
+        || (subjectFileFilter === 'JS'   && !!s.jsId)
+        || (subjectFileFilter === 'MSSS' && !!s.msssId);
+    }
+
+    // Re-applies both the file filter and the typed search text to the
+    // subject dropdown. Shared by the search box and the file-filter toggle
+    // so the two always combine consistently.
+    function applySubjectFilters() {
+      if (!subjectData) return;
+      const input = document.getElementById('subject-input');
+      const list  = document.getElementById('subject-list');
+      const q = input.value.trim().toLowerCase();
+      list.querySelectorAll('li').forEach(li => {
+        const s = subjectData.subjects.find(x => x.scheduleKey === li.dataset.key);
+        const matchesText = q.length === 0 || li.textContent.toLowerCase().includes(q);
+        li.classList.toggle('hidden', !(matchesText && subjectMatchesFilter(s)));
+      });
+    }
+
+    /**
+     * Switches which source file(s) a subject must appear in to be listed.
+     * Narrows the search dropdown and the prev/next roster; the selected
+     * subject's timeline still shows its full combined schedule regardless.
+     */
+    function setSubjectFileFilter(mode) {
+      subjectFileFilter = mode;
+      document.getElementById('btn-sf-all').classList.toggle('active',  mode === 'all');
+      document.getElementById('btn-sf-js').classList.toggle('active',   mode === 'JS');
+      document.getElementById('btn-sf-msss').classList.toggle('active', mode === 'MSSS');
+
+      applySubjectFilters();
+
+      // If the current subject fell outside the new filter, fall back to the
+      // first subject who still matches — same default used on initial load.
+      if (!currentSubject || !subjectMatchesFilter(currentSubject)) {
+        currentSubject = subjectData ? subjectData.subjects.find(subjectMatchesFilter) || null : null;
+        const input = document.getElementById('subject-input');
+        if (input) input.value = currentSubject ? currentSubject.name : '';
+        if (currentView === 'subjects') renderSubjectTimeline();
+      }
+    }
+
+    function onSubjectDataLoaded(data) {
+      subjectData = data;
+      const input = document.getElementById('subject-input');
+      const list  = document.getElementById('subject-list');
+      list.innerHTML = '';
+
+      data.subjects.forEach(s => {
+        const li = document.createElement('li');
+        li.dataset.key = s.scheduleKey;
+        li.textContent = s.name;
+        li.addEventListener('mousedown', () => selectSubject(s));
+        list.appendChild(li);
+      });
+      applySubjectFilters();
+
+      function selectSubject(s) {
+        currentSubject = s;
+        input.value = s.name;
+        list.classList.remove('open');
+        renderSubjectTimeline();
+      }
+
+      // Steps to the previous/next subject matching the current file filter
+      // (alphabetical order), wrapping at either end so repeated clicks keep
+      // cycling through everyone in that filter.
+      function stepSubject(delta) {
+        const pool = data.subjects.filter(subjectMatchesFilter);
+        if (!pool.length) return;
+        const idx = currentSubject
+          ? pool.findIndex(s => s.scheduleKey === currentSubject.scheduleKey)
+          : -1;
+        const next = (idx + delta + pool.length) % pool.length;
+        selectSubject(pool[next]);
+      }
+      document.getElementById('subject-prev').addEventListener('click', () => stepSubject(-1));
+      document.getElementById('subject-next').addEventListener('click', () => stepSubject(1));
+
+      input.addEventListener('focus', () => {
+        list.querySelectorAll('li').forEach(li => {
+          const s = data.subjects.find(x => x.scheduleKey === li.dataset.key);
+          li.classList.toggle('hidden', !subjectMatchesFilter(s));
+        });
+        list.classList.add('open');
+        input.select();
+      });
+      input.addEventListener('blur',  () => list.classList.remove('open'));
+      input.addEventListener('input', () => {
+        applySubjectFilters();
+        list.classList.add('open');
+        // If the typed text matches exactly one visible subject, pre-select them.
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        if (visible.length === 1) {
+          const match = data.subjects.find(s => s.scheduleKey === visible[0].dataset.key);
+          if (match) { currentSubject = match; renderSubjectTimeline(); }
+        }
+      });
+
+      currentSubject = data.subjects.find(subjectMatchesFilter) || null;
+      if (currentSubject) input.value = currentSubject.name;
+
+      const btn = document.getElementById('btn-refresh-subjects');
+      if (btn) btn.disabled = false;
+
+      // Re-render only when already in subject view (not during startup pre-load).
+      if (currentView === 'subjects') renderSubjectTimeline();
+    }
+
+    /** Forces a cache-busting reload of room data from the source XMLs. */
+    async function refreshRoomData() {
+      const btn = document.getElementById('btn-refresh-rooms');
+      if (btn) btn.disabled = true;
+      document.getElementById('grids').innerHTML =
+        `<div class="loading-inline"><div class="spinner"></div>Refreshing room data…</div>`;
+      try {
+        const data = await gsRun('getRoomData', true);
+        onRoomDataLoaded(data);
+      } catch (err) {
+        onError(err);
+      }
+    }
+
+    /**
+     * Whether a room belongs to the currently selected file filter. Unlike
+     * teachers/subjects, a room only ever has one source school, so this is
+     * a straightforward equality check rather than an "either ID present" one.
+     */
+    function roomMatchesFilter(r) {
+      return roomFileFilter === 'all'
+        || (roomFileFilter === 'JS'   && r.source === 'js')
+        || (roomFileFilter === 'MSSS' && r.source === 'ms');
+    }
+
+    // Re-applies both the file filter and the typed search text to the
+    // room dropdown. Shared by the search box and the file-filter toggle
+    // so the two always combine consistently.
+    function applyRoomFilters() {
+      if (!roomData) return;
+      const input = document.getElementById('room-input');
+      const list  = document.getElementById('room-list');
+      const q = input.value.trim().toLowerCase();
+      list.querySelectorAll('li').forEach(li => {
+        const r = roomData.rooms.find(x => x.scheduleKey === li.dataset.key);
+        const matchesText = q.length === 0 || li.textContent.toLowerCase().includes(q);
+        li.classList.toggle('hidden', !(matchesText && roomMatchesFilter(r)));
+      });
+    }
+
+    /** Switches which source school a room must belong to to be listed. */
+    function setRoomFileFilter(mode) {
+      roomFileFilter = mode;
+      document.getElementById('btn-rf-all').classList.toggle('active',  mode === 'all');
+      document.getElementById('btn-rf-js').classList.toggle('active',   mode === 'JS');
+      document.getElementById('btn-rf-msss').classList.toggle('active', mode === 'MSSS');
+
+      applyRoomFilters();
+
+      if (!currentRoom || !roomMatchesFilter(currentRoom)) {
+        currentRoom = roomData ? roomData.rooms.find(roomMatchesFilter) || null : null;
+        const input = document.getElementById('room-input');
+        if (input) input.value = currentRoom ? currentRoom.name : '';
+        if (currentView === 'rooms') renderRoomTimeline();
+      }
+    }
+
+    function onRoomDataLoaded(data) {
+      roomData = data;
+      const input = document.getElementById('room-input');
+      const list  = document.getElementById('room-list');
+      list.innerHTML = '';
+
+      data.rooms.forEach(r => {
+        const li = document.createElement('li');
+        li.dataset.key = r.scheduleKey;
+        li.textContent = r.name;
+        li.addEventListener('mousedown', () => selectRoom(r));
+        list.appendChild(li);
+      });
+      applyRoomFilters();
+
+      function selectRoom(r) {
+        currentRoom = r;
+        input.value = r.name;
+        list.classList.remove('open');
+        renderRoomTimeline();
+      }
+
+      // Steps to the previous/next room matching the current file filter
+      // (alphabetical order), wrapping at either end so repeated clicks keep
+      // cycling through everyone in that filter.
+      function stepRoom(delta) {
+        const pool = data.rooms.filter(roomMatchesFilter);
+        if (!pool.length) return;
+        const idx = currentRoom
+          ? pool.findIndex(r => r.scheduleKey === currentRoom.scheduleKey)
+          : -1;
+        const next = (idx + delta + pool.length) % pool.length;
+        selectRoom(pool[next]);
+      }
+      document.getElementById('room-prev').addEventListener('click', () => stepRoom(-1));
+      document.getElementById('room-next').addEventListener('click', () => stepRoom(1));
+
+      input.addEventListener('focus', () => {
+        list.querySelectorAll('li').forEach(li => {
+          const r = data.rooms.find(x => x.scheduleKey === li.dataset.key);
+          li.classList.toggle('hidden', !roomMatchesFilter(r));
+        });
+        list.classList.add('open');
+        input.select();
+      });
+      input.addEventListener('blur',  () => list.classList.remove('open'));
+      input.addEventListener('input', () => {
+        applyRoomFilters();
+        list.classList.add('open');
+        // If the typed text matches exactly one visible room, pre-select them.
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        if (visible.length === 1) {
+          const match = data.rooms.find(r => r.scheduleKey === visible[0].dataset.key);
+          if (match) { currentRoom = match; renderRoomTimeline(); }
+        }
+      });
+
+      currentRoom = data.rooms.find(roomMatchesFilter) || null;
+      if (currentRoom) input.value = currentRoom.name;
+
+      const btn = document.getElementById('btn-refresh-rooms');
+      if (btn) btn.disabled = false;
+
+      // Re-render only when already in room view (not during startup pre-load).
+      if (currentView === 'rooms') renderRoomTimeline();
+    }
+
     function onDataLoaded(data) {
       timetableData = data;
       const select = document.getElementById('tg-select');
@@ -943,16 +1347,22 @@
       currentView = view;
       document.getElementById('btn-view-classes').classList.toggle('active',  view === 'classes');
       document.getElementById('btn-view-teachers').classList.toggle('active', view === 'teachers');
+      document.getElementById('btn-view-subjects').classList.toggle('active', view === 'subjects');
+      document.getElementById('btn-view-rooms').classList.toggle('active',    view === 'rooms');
       document.getElementById('class-controls').style.display   = view === 'classes'  ? 'contents' : 'none';
       document.getElementById('teacher-controls').style.display = view === 'teachers' ? 'contents' : 'none';
-      document.getElementById('legend').style.display           = view === 'teachers' ? 'none' : '';
+      document.getElementById('subject-controls').style.display = view === 'subjects' ? 'contents' : 'none';
+      document.getElementById('room-controls').style.display    = view === 'rooms'    ? 'contents' : 'none';
+      // The subject-highlight legend only makes sense in Classes view, where
+      // several subjects are visible at once — the other views already scope
+      // to one selected entity.
+      document.getElementById('legend').style.display = view === 'classes' ? '' : 'none';
+      activeFilters.clear();
 
-      if (view === 'teachers') {
-        activeFilters.clear();
-        renderTeacherTimeline();
-      } else {
-        renderGrid();
-      }
+      if (view === 'teachers')      renderTeacherTimeline();
+      else if (view === 'subjects') renderSubjectTimeline();
+      else if (view === 'rooms')    renderRoomTimeline();
+      else                          renderGrid();
     }
 
     // ── Semester toggle ───────────────────────────────────────────────────────
@@ -960,11 +1370,11 @@
       currentSem = sem;
       document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
       document.getElementById('btn-s2').classList.toggle('active', sem === 'S2');
-      if (currentView === 'teachers') {
-        renderTeacherTimeline();
-      } else {
-        renderGrid();
-      }
+
+      if (currentView === 'teachers')      renderTeacherTimeline();
+      else if (currentView === 'subjects') renderSubjectTimeline();
+      else if (currentView === 'rooms')    renderRoomTimeline();
+      else                                 renderGrid();
     }
 
     // ── Filter ────────────────────────────────────────────────────────────────
@@ -1245,16 +1655,29 @@
      */
     const TL_PX_PER_MIN = 1.6;
 
-    function renderTeacherTimeline() {
-      if (!currentTeacher || !teacherData) return;
+    /**
+     * Renders a timeline for any cross-school entity (teacher, subject, or
+     * room) — they share the exact same schedule shape
+     * (schedules[key] = {msss, js}), differing only in how a raw schedule
+     * block should be shaped for display, which shapeBlock handles.
+     *
+     * @param {Object} entityData     e.g. teacherData/subjectData/roomData
+     * @param {Object} currentEntity  e.g. currentTeacher/currentSubject/currentRoom
+     * @param {(block: Object, source: 'ms'|'js') => Object} shapeBlock
+     *   Maps a raw schedule block into the {subject, subjectShort, classNames,
+     *   groupNames, roomShort, startMin, endMin, source} shape
+     *   buildTimelineSection expects.
+     */
+    function renderEntityTimeline(entityData, currentEntity, shapeBlock) {
+      if (!currentEntity || !entityData) return;
 
       const gridsEl = document.getElementById('grids');
       gridsEl.innerHTML = '';
 
-      const sched = teacherData.schedules[currentTeacher.scheduleKey];
+      const sched = entityData.schedules[currentEntity.scheduleKey];
       if (!sched) return;
 
-      const { msssPeriods, jsPeriods } = teacherData;
+      const { msssPeriods, jsPeriods } = entityData;
       const allPeriods = [...msssPeriods, ...jsPeriods];
       const rangeStart = Math.min(...allPeriods.map(p => p.startMin));
       const rangeEnd   = Math.max(...allPeriods.map(p => p.endMin));
@@ -1268,7 +1691,7 @@
       const hasMsss = !!sched.msss;
       const hasJs   = !!sched.js;
       /*
-       * splitBySource: when the teacher appears in both schools, each day column
+       * splitBySource: when the entity appears in both schools, each day column
        * is split left (JS) / right (MSSS), matching the period strips on either
        * side. Lessons at the same time will sit side-by-side, making scheduling
        * conflicts immediately visible.
@@ -1290,10 +1713,10 @@
 
           const dayData = {};
           for (let d = 1; d <= 5; d++) {
-            dayData[d] = [
-              ...(msssDay[d] || []).map(l => ({ ...l, source: 'ms' })),
-              ...(jsDay[d]   || []).map(l => ({ ...l, source: 'js' }))
-            ];
+            dayData[d] = groupIntoStacks([
+              ...(msssDay[d] || []).map(l => shapeBlock(l, 'ms')),
+              ...(jsDay[d]   || []).map(l => shapeBlock(l, 'js'))
+            ]);
           }
 
           gridsEl.appendChild(buildTimelineSection(
@@ -1302,17 +1725,70 @@
           ));
         });
       } else {
-        // JS-only teacher: a single week block, full-width blocks.
+        // JS-only (or, for rooms, JS-owned): a single week block, full-width blocks.
         const jsDay = sched.js[currentSem]?.['single'] || {};
         const dayData = {};
         for (let d = 1; d <= 5; d++) {
-          dayData[d] = (jsDay[d] || []).map(l => ({ ...l, source: 'js' }));
+          dayData[d] = groupIntoStacks((jsDay[d] || []).map(l => shapeBlock(l, 'js')));
         }
         gridsEl.appendChild(buildTimelineSection(
           'Schedule', dayData, dayLabels, false,
           rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods
         ));
       }
+    }
+
+    /**
+     * Groups same-time blocks (identical start, end, and school source) into
+     * stacks. Subject/Room views regularly have many concurrent lessons at
+     * one time slot — e.g. Advisory, taught by a different teacher per
+     * homeroom but all at the same period — which would otherwise render as
+     * fully overlapping absolutely-positioned blocks with only the last one
+     * visible. A stack of 1 renders exactly like a normal block; 2+ renders
+     * as a single clickable "N sessions" card (see buildTimelineSection)
+     * that expands to a detail list on click, since there's no reasonable
+     * fixed width to split an arbitrary, potentially large number of
+     * concurrent sessions into side-by-side columns the way Classes view
+     * does for a handful of simultaneous groups.
+     *
+     * @param {Array} blocks
+     * @returns {Array<Array>} an array of stacks, each an array of 1+ blocks
+     */
+    function groupIntoStacks(blocks) {
+      const byKey = {};
+      const order = [];
+      blocks.forEach(b => {
+        const key = `${b.startMin}|${b.endMin}|${b.source}`;
+        if (!byKey[key]) { byKey[key] = []; order.push(key); }
+        byKey[key].push(b);
+      });
+      return order.map(key => byKey[key]);
+    }
+
+    function renderTeacherTimeline() {
+      renderEntityTimeline(teacherData, currentTeacher, (l, source) => ({ ...l, source }));
+    }
+
+    function renderSubjectTimeline() {
+      renderEntityTimeline(subjectData, currentSubject, (l, source) => ({
+        ...l,
+        source,
+        // Subject is already fixed/known (that's what's selected), so the
+        // "subject" header slot is repurposed to show who's teaching it —
+        // more useful here than repeating the subject name on every block.
+        subject:      l.teacherNames,
+        subjectShort: currentSubject.short,
+      }));
+    }
+
+    function renderRoomTimeline() {
+      renderEntityTimeline(roomData, currentRoom, (l, source) => ({
+        ...l,
+        source,
+        // The room is already fixed/known, so the "room" slot is repurposed
+        // to show who's teaching there instead of repeating the room name.
+        roomShort: l.teacherNames,
+      }));
     }
 
     /**
@@ -1353,7 +1829,7 @@
       colsEl.className = 'tl-cols';
 
       DAYS.forEach(d => {
-        const lessons = dayData[d] || [];
+        const stacks = dayData[d] || [];
         const col = document.createElement('div');
         col.className = 'tl-day-col';
         col.style.height = containerH + 'px';
@@ -1372,7 +1848,8 @@
           col.appendChild(divider);
         }
 
-        lessons.forEach(lesson => {
+        stacks.forEach(stack => {
+          const lesson = stack[0];  // startMin/endMin/source are shared by the whole stack
           const el = document.createElement('div');
           el.className = 'tl-block';
           el.style.background = subjectColour(lesson.subjectShort);
@@ -1393,25 +1870,41 @@
           const badgeHtml = splitBySource
             ? `<span class="tl-source tl-source-${lesson.source}">${lesson.source === 'js' ? 'JS' : 'MS'}</span>`
             : '';
-          const groupsHtml = lesson.groupNames.length
-            ? `<div class="tl-block-groups">${lesson.groupNames.join(', ')}</div>` : '';
 
-          el.innerHTML = `
-            <div class="tl-block-header">
-              <div class="tl-block-subject">${lesson.subject}</div>
-              ${badgeHtml}
-            </div>
-            <div class="tl-block-class">${lesson.classNames}</div>
-            ${groupsHtml}
-            <div class="tl-block-room">${lesson.roomShort}</div>
-            <div class="tl-block-time">${formatTime(lesson.startMin)}–${formatTime(lesson.endMin)}</div>
-          `;
-          el.title = [
-            `[${lesson.source === 'js' ? 'JS' : 'MS'}] ${lesson.subject}`,
-            lesson.classNames,
-            lesson.groupNames.join(', '),
-            lesson.roomShort
-          ].filter(Boolean).join('\n');
+          if (stack.length > 1) {
+            // Many concurrent sessions (e.g. Advisory) — see groupIntoStacks().
+            el.classList.add('tl-block-stacked');
+            el.innerHTML = `
+              <div class="tl-block-header">
+                <div class="tl-block-subject">${stack.length} sessions</div>
+                ${badgeHtml}
+              </div>
+              <div class="tl-block-class">Click to view all</div>
+              <div class="tl-block-time">${formatTime(lesson.startMin)}–${formatTime(lesson.endMin)}</div>
+            `;
+            el.title = `${stack.length} concurrent sessions — click to view`;
+            el.addEventListener('click', () => showLessonStack(stack));
+          } else {
+            const groupsHtml = lesson.groupNames.length
+              ? `<div class="tl-block-groups">${lesson.groupNames.join(', ')}</div>` : '';
+
+            el.innerHTML = `
+              <div class="tl-block-header">
+                <div class="tl-block-subject">${lesson.subject}</div>
+                ${badgeHtml}
+              </div>
+              <div class="tl-block-class">${lesson.classNames}</div>
+              ${groupsHtml}
+              <div class="tl-block-room">${lesson.roomShort}</div>
+              <div class="tl-block-time">${formatTime(lesson.startMin)}–${formatTime(lesson.endMin)}</div>
+            `;
+            el.title = [
+              `[${lesson.source === 'js' ? 'JS' : 'MS'}] ${lesson.subject}`,
+              lesson.classNames,
+              lesson.groupNames.join(', '),
+              lesson.roomShort
+            ].filter(Boolean).join('\n');
+          }
 
           col.appendChild(el);
         });
@@ -1424,6 +1917,39 @@
       body.appendChild(buildPeriodStrip(msssPeriods, rangeStart, totalMin, containerH, 'right', 'MS / SS'));
       block.appendChild(body);
       return block;
+    }
+
+    /**
+     * Opens the lesson-stack modal listing every concurrent session in a
+     * stacked timeline card (see groupIntoStacks()). Each block's fields
+     * already carry whatever's meaningful for the current view — e.g. in
+     * Subject view "subject" was repurposed to hold the teacher's name
+     * (see renderSubjectTimeline) — so this just displays what's there
+     * rather than assuming any particular view.
+     */
+    function showLessonStack(stack) {
+      const first = stack[0];
+      document.getElementById('lesson-stack-title').textContent =
+        `${formatTime(first.startMin)}–${formatTime(first.endMin)} · ${stack.length} concurrent sessions`;
+
+      document.getElementById('lesson-stack-body').innerHTML = stack
+        .map(b => {
+          const groupsSuffix = b.groupNames && b.groupNames.length ? ` · ${b.groupNames.join(', ')}` : '';
+          return `
+            <div class="lesson-stack-item">
+              <div class="lesson-stack-item-header">${b.subject}</div>
+              <div class="lesson-stack-item-detail">${b.classNames}${groupsSuffix}</div>
+              <div class="lesson-stack-item-detail">${b.roomShort}</div>
+            </div>
+          `;
+        })
+        .join('');
+
+      document.getElementById('lesson-stack-modal').classList.add('open');
+    }
+
+    function closeLessonStack() {
+      document.getElementById('lesson-stack-modal').classList.remove('open');
     }
 
     /**

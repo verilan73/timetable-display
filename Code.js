@@ -767,6 +767,8 @@ function cardMatchesWeekTerm(card, weekBit, termBit) {
 
 const TIMETABLE_CACHE_KEY = 'timetable_data_v1';
 const TEACHER_CACHE_KEY   = 'timetable_teacher_v1';
+const SUBJECT_CACHE_KEY   = 'timetable_subject_v1';
+const ROOM_CACHE_KEY      = 'timetable_room_v1';
 const CACHE_CHUNK_SIZE    = 90000;  // 90 KB per chunk (leaves headroom under 100 KB limit)
 const CACHE_TTL           = 21600;  // 6 hours — a ceiling, not the normal invalidation
                                      // path; a fingerprint mismatch invalidates sooner.
@@ -830,6 +832,40 @@ function clearCachedJson(key) {
 }
 
 /**
+ * Shared "fingerprinted cache over both schools' XML files" wrapper for
+ * getTeacherData/getSubjectData/getRoomData — they differ only in which
+ * cache key and builder function to use, so this is the one place that
+ * actually finds the files, computes the combined fingerprint, and decides
+ * whether to serve from cache or rebuild.
+ *
+ * @param {string} cacheKey
+ * @param {(msssFile: GoogleAppsScript.Drive.File, jsFile: GoogleAppsScript.Drive.File) => Object} build
+ * @param {boolean} forceRefresh
+ * @param {string} label  Identifies the caller in the cache hit/miss log line.
+ * @returns {Object}
+ */
+function getCachedTwoSchoolData(cacheKey, build, forceRefresh, label) {
+  const start = Date.now();
+  const { msssFilename, jsFilename } = getConfig();
+  const msssFile = findTimetableFile(msssFilename);
+  const jsFile   = findTimetableFile(jsFilename);
+  const fingerprint = fileFingerprint(msssFile) + '|' + fileFingerprint(jsFile);
+
+  if (!forceRefresh) {
+    const cached = getCachedJson(cacheKey, fingerprint);
+    if (cached) {
+      Logger.log(`${label}: cache hit in ${Date.now() - start}ms`);
+      return cached;
+    }
+  }
+
+  const data = build(msssFile, jsFile);
+  putCachedJson(cacheKey, fingerprint, data);
+  Logger.log(`${label}: cache miss, rebuilt in ${Date.now() - start}ms`);
+  return data;
+}
+
+/**
  * Returns merged teacher roster and per-teacher schedules from both school XMLs.
  * Results are served from the script-level cache when the source files
  * haven't changed since the cache was built, so only the first request after
@@ -847,24 +883,34 @@ function clearCachedJson(key) {
  * @returns {{teachers: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
  */
 function getTeacherData(forceRefresh) {
-  const start = Date.now();
-  const { msssFilename, jsFilename } = getConfig();
-  const msssFile = findTimetableFile(msssFilename);
-  const jsFile   = findTimetableFile(jsFilename);
-  const fingerprint = fileFingerprint(msssFile) + '|' + fileFingerprint(jsFile);
+  return getCachedTwoSchoolData(TEACHER_CACHE_KEY, buildTeacherData, forceRefresh, 'getTeacherData');
+}
 
-  if (!forceRefresh) {
-    const cached = getCachedJson(TEACHER_CACHE_KEY, fingerprint);
-    if (cached) {
-      Logger.log(`getTeacherData: cache hit in ${Date.now() - start}ms`);
-      return cached;
-    }
-  }
+/**
+ * Returns merged subject roster and per-subject schedules from both school XMLs.
+ * Subjects are matched across schools by exact, case-insensitive name — unlike
+ * teachers, subject names are curated categorical labels rather than personal
+ * names, so a name match reliably means the same subject (e.g. "Music" is
+ * taught at both schools) rather than two different things sharing a label.
+ *
+ * @param {boolean} [forceRefresh=false]
+ * @returns {{subjects: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
+ */
+function getSubjectData(forceRefresh) {
+  return getCachedTwoSchoolData(SUBJECT_CACHE_KEY, buildSubjectData, forceRefresh, 'getSubjectData');
+}
 
-  const data = buildTeacherData(msssFile, jsFile);
-  putCachedJson(TEACHER_CACHE_KEY, fingerprint, data);
-  Logger.log(`getTeacherData: cache miss, rebuilt in ${Date.now() - start}ms`);
-  return data;
+/**
+ * Returns the combined classroom roster and per-room schedules from both
+ * school XMLs. Unlike teachers/subjects, room names never overlap between
+ * the two schools' data (verified against the real exports), so there is no
+ * cross-school merge here — every room belongs to exactly one school.
+ *
+ * @param {boolean} [forceRefresh=false]
+ * @returns {{rooms: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
+ */
+function getRoomData(forceRefresh) {
+  return getCachedTwoSchoolData(ROOM_CACHE_KEY, buildRoomData, forceRefresh, 'getRoomData');
 }
 
 /**
@@ -875,6 +921,16 @@ function getTeacherData(forceRefresh) {
  */
 function clearTeacherCache() {
   clearCachedJson(TEACHER_CACHE_KEY);
+}
+
+/** Clears the cached subject data. Not required in normal use — see clearTeacherCache(). */
+function clearSubjectCache() {
+  clearCachedJson(SUBJECT_CACHE_KEY);
+}
+
+/** Clears the cached room data. Not required in normal use — see clearTeacherCache(). */
+function clearRoomCache() {
+  clearCachedJson(ROOM_CACHE_KEY);
 }
 
 /**
@@ -965,6 +1021,107 @@ function buildTeacherData(msssFile, jsFile) {
 }
 
 /**
+ * Builds the full subject dataset by loading and parsing both XML files.
+ * This is the slow path; results are cached by getSubjectData().
+ *
+ * Unlike buildTeacherData's two-tier merge, subjects match across schools by
+ * a single, case-insensitive name comparison — there's no subject-level
+ * equivalent of an email to prefer, and none is needed: subject names are
+ * curated categorical labels (e.g. "Music"), not personal names, so a name
+ * collision reliably means the same subject.
+ *
+ * @param {GoogleAppsScript.Drive.File} msssFile
+ * @param {GoogleAppsScript.Drive.File} jsFile
+ * @returns {{subjects: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
+ */
+function buildSubjectData(msssFile, jsFile) {
+  const msssDoc = loadXmlFromDrive(msssFile);
+  const jsDoc   = loadXmlFromDrive(jsFile);
+
+  const msss = parseScheduleSource(msssDoc);
+  const js   = parseScheduleSource(jsDoc);
+
+  function normaliseName(name) {
+    return (name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  }
+
+  const byKey = {};
+  const keyByName = {};
+
+  Object.entries(msss.subjects).forEach(([id, s]) => {
+    const key = `m:${id}`;
+    byKey[key] = { name: s.name, short: s.short, msssId: id, jsId: null };
+    keyByName[normaliseName(s.name)] = key;
+  });
+
+  Object.entries(js.subjects).forEach(([id, s]) => {
+    const norm = normaliseName(s.name);
+    let key = keyByName[norm];
+    if (!key) {
+      key = `j:${id}`;
+      byKey[key] = { name: s.name, short: s.short, msssId: null, jsId: null };
+      keyByName[norm] = key;
+    }
+    byKey[key].jsId = id;
+  });
+
+  const subjects = Object.entries(byKey)
+    .map(([key, s]) => ({ ...s, scheduleKey: key }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const schedules = {};
+  subjects.forEach(s => {
+    schedules[s.scheduleKey] = {
+      msss: s.msssId ? buildSubjectSchedule(s.msssId, msss) : null,
+      js:   s.jsId   ? buildSubjectSchedule(s.jsId,   js)   : null
+    };
+  });
+
+  return { subjects, schedules, msssPeriods: msss.periods, jsPeriods: js.periods };
+}
+
+/**
+ * Builds the full classroom dataset by loading and parsing both XML files.
+ * This is the slow path; results are cached by getRoomData().
+ *
+ * No cross-school merge is needed — room names never overlap between the two
+ * exports — so this just concatenates both schools' classroom lists, each
+ * tagged with which school it belongs to.
+ *
+ * @param {GoogleAppsScript.Drive.File} msssFile
+ * @param {GoogleAppsScript.Drive.File} jsFile
+ * @returns {{rooms: Array, schedules: Object, msssPeriods: Array, jsPeriods: Array}}
+ */
+function buildRoomData(msssFile, jsFile) {
+  const msssDoc = loadXmlFromDrive(msssFile);
+  const jsDoc   = loadXmlFromDrive(jsFile);
+
+  const msss = parseScheduleSource(msssDoc);
+  const js   = parseScheduleSource(jsDoc);
+
+  const rooms = [];
+  const schedules = {};
+
+  // schedules[key] must be {msss, js} like buildTeacherData/buildSubjectData —
+  // renderEntityTimeline() on the frontend reads sched.msss/sched.js uniformly
+  // across all three entity types.
+  Object.entries(msss.classrooms).forEach(([id, r]) => {
+    const key = `m:${id}`;
+    rooms.push({ name: r.name, short: r.short, source: 'ms', scheduleKey: key });
+    schedules[key] = { msss: buildRoomSchedule(id, msss), js: null };
+  });
+  Object.entries(js.classrooms).forEach(([id, r]) => {
+    const key = `j:${id}`;
+    rooms.push({ name: r.name, short: r.short, source: 'js', scheduleKey: key });
+    schedules[key] = { msss: null, js: buildRoomSchedule(id, js) };
+  });
+
+  rooms.sort((a, b) => a.name.localeCompare(b.name));
+
+  return { rooms, schedules, msssPeriods: msss.periods, jsPeriods: js.periods };
+}
+
+/**
  * Parses all schedule-relevant sections from one XML document, including the
  * weeksMode so callers know how to interpret the card week bit-fields.
  * Reuses the same individual parsers that the class/TG view uses.
@@ -989,21 +1146,25 @@ function parseScheduleSource(doc) {
 }
 
 /**
- * Builds a per-teacher schedule from a parsed source.
- * Returned structure: schedule[semester][week][day] = Array of lesson-block objects.
+ * Scans every card in a parsed source and builds a per-day schedule from
+ * whichever ones match, shaping each into a block via a caller-supplied
+ * builder. Shared by buildTeacherSchedule/buildSubjectSchedule/
+ * buildRoomSchedule — they're otherwise identical and previously duplicated
+ * this exact scan, differing only in which lesson field to filter on and
+ * which fields to surface in each block.
+ *
+ * Returned structure: schedule[semester][week][day] = Array of block objects.
  * For a JS source, week is always 'single'; for MSSS it is 'A' or 'B'.
  *
- * Each lesson block contains the subject, class(es), group names, room, and the
- * real start/end times in minutes-from-midnight so the frontend can position
- * blocks accurately on the shared time axis.
- *
- * @param {string} teacherId
- * @param {Object} source    Output of parseScheduleSource()
+ * @param {Object} source  Output of parseScheduleSource()
+ * @param {(lesson: Object, card: Object) => boolean} matches
+ *   Whether this card belongs in the schedule being built.
+ * @param {(lesson: Object, card: Object, period: Object) => Object} buildBlock
+ *   Shapes a matching card into the block object the frontend expects.
  * @returns {Object}
  */
-function buildTeacherSchedule(teacherId, source) {
+function buildEntitySchedule(source, matches, buildBlock) {
   const weekEntries = weekEntriesFor(source.weeksMode);
-
   const schedule = {};
 
   ['S1', 'S2'].forEach(semester => {
@@ -1021,40 +1182,113 @@ function buildTeacherSchedule(teacherId, source) {
         if (!day) return;
 
         const lesson = source.lessons[card.lessonId];
-        if (!lesson || !lesson.teacherIds.includes(teacherId)) return;
+        if (!lesson) return;
+        if (!matches(lesson, card)) return;
 
         const period = source.periods.find(p => p.period === card.period);
         if (!period) return;
 
-        const subj = source.subjects[lesson.subjectId] || { name: 'Unknown', short: '?' };
-
-        const classNames = lesson.classIds
-          .map(id => (source.classes[id] || {}).short || id)
-          .join(', ');
-
-        const groupNames = lesson.groupIds
-          .map(gId => source.groups[gId])
-          .filter(g => g && !g.entireClass)
-          .map(g => g.name);
-
-        const roomIds = card.classroomIds.length > 0
-          ? card.classroomIds : lesson.classroomIds;
-        const roomShort = roomIds
-          .map(id => (source.classrooms[id] || {}).short || id)
-          .join(', ');
-
-        schedule[semester][week][day].push({
-          subjectShort: subj.short,
-          subject:      subj.name,
-          startMin:     period.startMin,
-          endMin:       period.endMin,
-          classNames,
-          groupNames,
-          roomShort
-        });
+        schedule[semester][week][day].push(buildBlock(lesson, card, period));
       });
     });
   });
 
   return schedule;
+}
+
+/** Resolves a card's room IDs — the card's own if set, else the lesson's default. */
+function resolveRoomIds(lesson, card) {
+  return card.classroomIds.length > 0 ? card.classroomIds : lesson.classroomIds;
+}
+
+/**
+ * Builds a per-teacher schedule from a parsed source: every lesson taught by
+ * this teacher, with the subject, class(es), group names, room, and real
+ * start/end times (minutes-from-midnight) the frontend positions blocks with.
+ *
+ * @param {string} teacherId
+ * @param {Object} source  Output of parseScheduleSource()
+ * @returns {Object}
+ */
+function buildTeacherSchedule(teacherId, source) {
+  return buildEntitySchedule(
+    source,
+    lesson => lesson.teacherIds.includes(teacherId),
+    (lesson, card, period) => {
+      const subj = source.subjects[lesson.subjectId] || { name: 'Unknown', short: '?' };
+      const classNames = lesson.classIds.map(id => (source.classes[id] || {}).short || id).join(', ');
+      const groupNames = lesson.groupIds.map(gId => source.groups[gId]).filter(g => g && !g.entireClass).map(g => g.name);
+      const roomShort  = resolveRoomIds(lesson, card).map(id => (source.classrooms[id] || {}).short || id).join(', ');
+      return {
+        subjectShort: subj.short,
+        subject:      subj.name,
+        startMin:     period.startMin,
+        endMin:       period.endMin,
+        classNames,
+        groupNames,
+        roomShort
+      };
+    }
+  );
+}
+
+/**
+ * Builds a per-subject schedule from a parsed source: every occurrence of
+ * this subject, across whichever teachers and classes teach it, with the
+ * teacher name(s), class(es), group names, room, and real start/end times.
+ *
+ * @param {string} subjectId
+ * @param {Object} source  Output of parseScheduleSource()
+ * @returns {Object}
+ */
+function buildSubjectSchedule(subjectId, source) {
+  return buildEntitySchedule(
+    source,
+    lesson => lesson.subjectId === subjectId,
+    (lesson, card, period) => {
+      const teacherNames = lesson.teacherIds.map(id => (source.teachers[id] || {}).name || id).join(', ');
+      const classNames   = lesson.classIds.map(id => (source.classes[id] || {}).short || id).join(', ');
+      const groupNames   = lesson.groupIds.map(gId => source.groups[gId]).filter(g => g && !g.entireClass).map(g => g.name);
+      const roomShort    = resolveRoomIds(lesson, card).map(id => (source.classrooms[id] || {}).short || id).join(', ');
+      return {
+        teacherNames,
+        startMin: period.startMin,
+        endMin:   period.endMin,
+        classNames,
+        groupNames,
+        roomShort
+      };
+    }
+  );
+}
+
+/**
+ * Builds a per-classroom schedule from a parsed source: every lesson booked
+ * into this room, with the subject, teacher name(s), class(es), group names,
+ * and real start/end times.
+ *
+ * @param {string} classroomId
+ * @param {Object} source  Output of parseScheduleSource()
+ * @returns {Object}
+ */
+function buildRoomSchedule(classroomId, source) {
+  return buildEntitySchedule(
+    source,
+    (lesson, card) => resolveRoomIds(lesson, card).includes(classroomId),
+    (lesson, card, period) => {
+      const subj = source.subjects[lesson.subjectId] || { name: 'Unknown', short: '?' };
+      const teacherNames = lesson.teacherIds.map(id => (source.teachers[id] || {}).name || id).join(', ');
+      const classNames   = lesson.classIds.map(id => (source.classes[id] || {}).short || id).join(', ');
+      const groupNames   = lesson.groupIds.map(gId => source.groups[gId]).filter(g => g && !g.entireClass).map(g => g.name);
+      return {
+        subjectShort: subj.short,
+        subject:      subj.name,
+        teacherNames,
+        startMin: period.startMin,
+        endMin:   period.endMin,
+        classNames,
+        groupNames
+      };
+    }
+  );
 }
