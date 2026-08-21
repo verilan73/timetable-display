@@ -1156,6 +1156,36 @@
       document.getElementById('teacher-prev').addEventListener('click', () => stepTeacher(-1));
       document.getElementById('teacher-next').addEventListener('click', () => stepTeacher(1));
 
+      input.addEventListener('keydown', e => {
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        const current = list.querySelector('li.active');
+        const idx     = current ? visible.indexOf(current) : -1;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const next = visible[idx < visible.length - 1 ? idx + 1 : 0];
+          if (next) { next.classList.add('active'); next.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const prev = visible[idx > 0 ? idx - 1 : visible.length - 1];
+          if (prev) { prev.classList.add('active'); prev.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const target = current || (visible.length === 1 ? visible[0] : null);
+          if (target) {
+            const match = data.teachers.find(t => t.scheduleKey === target.dataset.key);
+            if (match) { target.classList.remove('active'); selectTeacher(match); }
+          }
+        } else if (e.key === 'Escape') {
+          visible.forEach(li => li.classList.remove('active'));
+          list.classList.remove('open');
+        }
+      });
+
       input.addEventListener('focus', () => {
         // Show the full (filtered) roster on focus, not just whoever is
         // currently selected, so scanning through names doesn't require
@@ -1168,8 +1198,12 @@
         list.classList.add('open');
         input.select();
       });
-      input.addEventListener('blur',  () => list.classList.remove('open'));
+      input.addEventListener('blur',  () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
+        list.classList.remove('open');
+      });
       input.addEventListener('input', () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
         applyTeacherFilters();
         list.classList.add('open');
         // If the typed text matches exactly one visible teacher, pre-select them.
@@ -1293,6 +1327,36 @@
       document.getElementById('subject-prev').addEventListener('click', () => stepSubject(-1));
       document.getElementById('subject-next').addEventListener('click', () => stepSubject(1));
 
+      input.addEventListener('keydown', e => {
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        const current = list.querySelector('li.active');
+        const idx     = current ? visible.indexOf(current) : -1;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const next = visible[idx < visible.length - 1 ? idx + 1 : 0];
+          if (next) { next.classList.add('active'); next.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const prev = visible[idx > 0 ? idx - 1 : visible.length - 1];
+          if (prev) { prev.classList.add('active'); prev.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const target = current || (visible.length === 1 ? visible[0] : null);
+          if (target) {
+            const match = data.subjects.find(s => s.scheduleKey === target.dataset.key);
+            if (match) { target.classList.remove('active'); selectSubject(match); }
+          }
+        } else if (e.key === 'Escape') {
+          visible.forEach(li => li.classList.remove('active'));
+          list.classList.remove('open');
+        }
+      });
+
       input.addEventListener('focus', () => {
         list.querySelectorAll('li').forEach(li => {
           const s = data.subjects.find(x => x.scheduleKey === li.dataset.key);
@@ -1301,8 +1365,12 @@
         list.classList.add('open');
         input.select();
       });
-      input.addEventListener('blur',  () => list.classList.remove('open'));
+      input.addEventListener('blur',  () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
+        list.classList.remove('open');
+      });
       input.addEventListener('input', () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
         applySubjectFilters();
         list.classList.add('open');
         // If the typed text matches exactly one visible subject, pre-select them.
@@ -1417,6 +1485,36 @@
       document.getElementById('room-prev').addEventListener('click', () => stepRoom(-1));
       document.getElementById('room-next').addEventListener('click', () => stepRoom(1));
 
+      input.addEventListener('keydown', e => {
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        const current = list.querySelector('li.active');
+        const idx     = current ? visible.indexOf(current) : -1;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const next = visible[idx < visible.length - 1 ? idx + 1 : 0];
+          if (next) { next.classList.add('active'); next.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const prev = visible[idx > 0 ? idx - 1 : visible.length - 1];
+          if (prev) { prev.classList.add('active'); prev.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const target = current || (visible.length === 1 ? visible[0] : null);
+          if (target) {
+            const match = data.rooms.find(r => r.scheduleKey === target.dataset.key);
+            if (match) { target.classList.remove('active'); selectRoom(match); }
+          }
+        } else if (e.key === 'Escape') {
+          visible.forEach(li => li.classList.remove('active'));
+          list.classList.remove('open');
+        }
+      });
+
       input.addEventListener('focus', () => {
         list.querySelectorAll('li').forEach(li => {
           const r = data.rooms.find(x => x.scheduleKey === li.dataset.key);
@@ -1425,8 +1523,12 @@
         list.classList.add('open');
         input.select();
       });
-      input.addEventListener('blur',  () => list.classList.remove('open'));
+      input.addEventListener('blur',  () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
+        list.classList.remove('open');
+      });
       input.addEventListener('input', () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
         applyRoomFilters();
         list.classList.add('open');
         // If the typed text matches exactly one visible room, pre-select them.
@@ -2189,9 +2291,54 @@
           addMeetingPerson(t);
           input.value = '';
           applyMeetingFilter();
+          // Keep dropdown closed after a mouse-click pick; keydown flow keeps it open.
           list.classList.remove('open');
         });
         list.appendChild(li);
+      });
+
+      // Selects the person identified by scheduleKey via keyboard, then leaves
+      // the input focused and the dropdown open so the next name can be typed
+      // immediately without any extra click.
+      function selectByKey(key) {
+        const teacher = teachers.find(t => t.scheduleKey === key);
+        if (!teacher) return;
+        addMeetingPerson(teacher);
+        input.value = '';
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
+        applyMeetingFilter();
+        list.classList.add('open');   // stay open for the next person
+      }
+
+      input.addEventListener('keydown', e => {
+        const visible = [...list.querySelectorAll('li:not(.hidden)')];
+        const current = list.querySelector('li.active');
+        const idx     = current ? visible.indexOf(current) : -1;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const next = visible[idx < visible.length - 1 ? idx + 1 : 0];
+          if (next) { next.classList.add('active'); next.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          visible.forEach(li => li.classList.remove('active'));
+          const prev = visible[idx > 0 ? idx - 1 : visible.length - 1];
+          if (prev) { prev.classList.add('active'); prev.scrollIntoView({ block: 'nearest' }); }
+          list.classList.add('open');
+
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          // Use the highlighted item, or auto-select when exactly one remains.
+          const target = current || (visible.length === 1 ? visible[0] : null);
+          if (target) selectByKey(target.dataset.key);
+
+        } else if (e.key === 'Escape') {
+          visible.forEach(li => li.classList.remove('active'));
+          list.classList.remove('open');
+        }
       });
 
       input.addEventListener('focus', () => {
@@ -2199,8 +2346,13 @@
         list.classList.add('open');
         input.select();
       });
-      input.addEventListener('blur', () => list.classList.remove('open'));
+      input.addEventListener('blur', () => {
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
+        list.classList.remove('open');
+      });
       input.addEventListener('input', () => {
+        // Clear keyboard highlight whenever the user types — position is stale.
+        list.querySelectorAll('li.active').forEach(li => li.classList.remove('active'));
         applyMeetingFilter();
         list.classList.add('open');
       });
