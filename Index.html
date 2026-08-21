@@ -604,6 +604,144 @@
     .lesson-stack-item:last-child { margin-bottom: 0; }
     .lesson-stack-item-header { font-weight: 700; font-size: 12.5px; color: #1a1a2e; }
     .lesson-stack-item-detail { font-size: 11px; color: rgba(0,0,0,0.75); margin-top: 2px; }
+
+    /* ── Meeting finder ────────────────────────────────────────────────────── */
+    .mf-best-times {
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      line-height: 1.8;
+      background: #f1f8e9;
+      border: 1px solid #aed581;
+    }
+    .mf-best-times strong { color: #33691e; }
+    .mf-best-times.mf-no-times { background: #fff3e0; border-color: #ffcc02; }
+    .mf-best-times.mf-no-times strong { color: #e65100; }
+    .mf-best-chip {
+      display: inline-block;
+      background: #c8e6c9;
+      color: #1b5e20;
+      border-radius: 10px;
+      padding: 1px 9px;
+      margin: 1px 2px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .mf-more { font-size: 11px; color: #888; margin-left: 4px; }
+
+    .mf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .mf-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: white;
+      padding: 4px 10px 4px 12px;
+      border-radius: 16px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .mf-chip button {
+      background: rgba(255,255,255,0.25);
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 0 3px;
+      font-size: 12px;
+      border-radius: 50%;
+      line-height: 1.4;
+    }
+    .mf-chip button:hover { background: rgba(255,255,255,0.45); }
+
+    .mf-grid-section { margin-bottom: 28px; }
+    .mf-week-label { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; letter-spacing: 0.02em; }
+    .mf-grid { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .mf-grid th, .mf-grid td { border: 1px solid #ccd; }
+    .mf-grid th {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 4px;
+      background: #1a1a2e;
+      color: white;
+    }
+    .mf-col-period { width: 100px; }
+    .mf-period-label {
+      vertical-align: top;
+      padding: 4px 6px;
+      background: #f7f8fa;
+    }
+    .mf-period-name { display: block; font-size: 11.5px; font-weight: 600; color: #1a1a2e; }
+    .mf-period-time { display: block; font-size: 10px; color: #777; margin-top: 1px; }
+
+    /* Stacked mode */
+    .mf-cell-stacked {
+      vertical-align: top;
+      padding: 2px;
+      height: 44px;
+    }
+    .mf-stacked-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      height: 100%;
+    }
+    .mf-strip {
+      flex: 1;
+      border-radius: 2px;
+      min-height: 4px;
+    }
+    .mf-strip-free { background: #e8f5e9; }
+
+    /* Heatmap mode */
+    .mf-cell-heat {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 4px;
+      height: 44px;
+      vertical-align: middle;
+    }
+    .heat-all  { background: #c8e6c9; color: #1b5e20; }
+    .heat-most { background: #dcedc8; color: #33691e; }
+    .heat-mix  { background: #fff9c4; color: #f57f17; }
+    .heat-few  { background: #ffe0b2; color: #bf360c; }
+    .heat-none { background: #ffcdd2; color: #b71c1c; }
+
+    /* Highlight for "everyone free" slots in both modes */
+    .mf-best-slot { outline: 2px solid #2e7d32; outline-offset: -2px; }
+
+    .mf-legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      font-size: 11.5px;
+    }
+    .mf-leg {
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .mf-leg-stacked {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      padding: 2px 0;
+    }
+    .mf-leg-strip {
+      width: 18px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+    .mf-placeholder {
+      text-align: center;
+      color: #888;
+      padding: 48px 16px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -623,6 +761,7 @@
           <button id="btn-view-teachers"                onclick="setView('teachers')">Teachers</button>
           <button id="btn-view-subjects"                onclick="setView('subjects')">Subjects</button>
           <button id="btn-view-rooms"                   onclick="setView('rooms')">Rooms</button>
+          <button id="btn-view-meeting"                  onclick="setView('meeting')">Find a common time</button>
         </div>
       </div>
       <!-- Class-mode controls: school selector + group/class dropdown.
@@ -717,6 +856,25 @@
         <button id="btn-refresh-rooms" onclick="refreshRoomData()"
                 title="Reload room data from source XML files">↻ Refresh</button>
       </div>
+      <!-- Meeting-finder controls: people multi-select + display mode toggle, hidden by default -->
+      <div id="meeting-controls" style="display:none">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label for="meeting-input">People</label>
+          <div class="entity-search-wrap">
+            <input id="meeting-input" class="entity-search-input" type="text" placeholder="Add person…" autocomplete="off">
+            <ul id="meeting-list" class="entity-search-list"></ul>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Display</label>
+          <div class="toggle">
+            <button id="btn-meeting-stacked" class="active" onclick="setMeetingMode('stacked')">Stacked</button>
+            <button id="btn-meeting-heatmap"               onclick="setMeetingMode('heatmap')">Heatmap</button>
+          </div>
+        </div>
+      </div>
       <!-- Semester toggle — always visible -->
       <div class="control-group">
         <label>Semester</label>
@@ -771,6 +929,9 @@
     let currentRoom   = null;
     let roomFileFilter = 'all';      // 'all' | 'JS' | 'MSSS' — checked against each room's single source school
 
+    let meetingPeople = [];          // teacher objects currently selected in meeting finder
+    let meetingMode   = 'stacked';   // 'stacked' | 'heatmap'
+
     // ── Colours ───────────────────────────────────────────────────────────────
     // Lookups are always case-insensitive (see subjectColour) — the two XML
     // exports don't agree on capitalization for the same subject, so keys
@@ -798,6 +959,20 @@
     Object.entries(SUBJECT_COLOURS).forEach(([short, colour]) => {
       SUBJECT_COLOURS_LOWER[short.toLowerCase()] = colour;
     });
+
+    // Distinct dark colours for meeting-finder person chips and busy strips.
+    // Dark enough for white text; spread across the hue wheel for quick
+    // visual discrimination when multiple people are shown.
+    const PERSON_COLOURS = [
+      '#1565c0', // blue
+      '#c62828', // red
+      '#2e7d32', // green
+      '#f57f17', // amber
+      '#6a1b9a', // purple
+      '#00838f', // teal
+      '#4e342e', // brown
+      '#37474f', // slate
+    ];
 
     function subjectColour(short) {
       const match = SUBJECT_COLOURS_LOWER[short.toLowerCase()];
@@ -1010,6 +1185,9 @@
 
       const btn = document.getElementById('btn-refresh-teachers');
       if (btn) btn.disabled = false;
+
+      // Wire up the meeting-finder people search with the same teacher roster.
+      wireMeetingSearch(data.teachers);
 
       // Re-render only when already in teacher view (not during startup pre-load).
       if (currentView === 'teachers') renderTeacherTimeline();
@@ -1349,10 +1527,12 @@
       document.getElementById('btn-view-teachers').classList.toggle('active', view === 'teachers');
       document.getElementById('btn-view-subjects').classList.toggle('active', view === 'subjects');
       document.getElementById('btn-view-rooms').classList.toggle('active',    view === 'rooms');
+      document.getElementById('btn-view-meeting').classList.toggle('active',  view === 'meeting');
       document.getElementById('class-controls').style.display   = view === 'classes'  ? 'contents' : 'none';
       document.getElementById('teacher-controls').style.display = view === 'teachers' ? 'contents' : 'none';
       document.getElementById('subject-controls').style.display = view === 'subjects' ? 'contents' : 'none';
       document.getElementById('room-controls').style.display    = view === 'rooms'    ? 'contents' : 'none';
+      document.getElementById('meeting-controls').style.display = view === 'meeting'  ? 'contents' : 'none';
       // The subject-highlight legend only makes sense in Classes view, where
       // several subjects are visible at once — the other views already scope
       // to one selected entity.
@@ -1362,6 +1542,7 @@
       if (view === 'teachers')      renderTeacherTimeline();
       else if (view === 'subjects') renderSubjectTimeline();
       else if (view === 'rooms')    renderRoomTimeline();
+      else if (view === 'meeting')  renderMeetingFinder();
       else                          renderGrid();
     }
 
@@ -1374,6 +1555,7 @@
       if (currentView === 'teachers')      renderTeacherTimeline();
       else if (currentView === 'subjects') renderSubjectTimeline();
       else if (currentView === 'rooms')    renderRoomTimeline();
+      else if (currentView === 'meeting')  renderMeetingFinder();
       else                                 renderGrid();
     }
 
@@ -1985,6 +2167,280 @@
 
       strip.appendChild(body);
       return strip;
+    }
+
+    // ── Meeting finder ────────────────────────────────────────────────────────
+
+    /**
+     * Populates the meeting-finder search list with the full teacher roster.
+     * Called once from onTeacherDataLoaded() so the meeting-finder search is
+     * ready whenever the user switches to that view.
+     */
+    function wireMeetingSearch(teachers) {
+      const input = document.getElementById('meeting-input');
+      const list  = document.getElementById('meeting-list');
+      list.innerHTML = '';
+
+      teachers.forEach(t => {
+        const li = document.createElement('li');
+        li.dataset.key = t.scheduleKey;
+        li.textContent = t.name;
+        li.addEventListener('mousedown', () => {
+          addMeetingPerson(t);
+          input.value = '';
+          applyMeetingFilter();
+          list.classList.remove('open');
+        });
+        list.appendChild(li);
+      });
+
+      input.addEventListener('focus', () => {
+        applyMeetingFilter();
+        list.classList.add('open');
+        input.select();
+      });
+      input.addEventListener('blur', () => list.classList.remove('open'));
+      input.addEventListener('input', () => {
+        applyMeetingFilter();
+        list.classList.add('open');
+      });
+    }
+
+    /** Filters the meeting-search dropdown by the typed text, hiding already-selected people. */
+    function applyMeetingFilter() {
+      const input = document.getElementById('meeting-input');
+      const list  = document.getElementById('meeting-list');
+      if (!list) return;
+      const selectedKeys = new Set(meetingPeople.map(p => p.scheduleKey));
+      const q = input.value.trim().toLowerCase();
+      list.querySelectorAll('li').forEach(li => {
+        const matchesText = q.length === 0 || li.textContent.toLowerCase().includes(q);
+        const alreadySelected = selectedKeys.has(li.dataset.key);
+        li.classList.toggle('hidden', !matchesText || alreadySelected);
+      });
+    }
+
+    /** Adds a teacher to the meeting-finder selection and re-renders. */
+    function addMeetingPerson(teacher) {
+      if (meetingPeople.some(p => p.scheduleKey === teacher.scheduleKey)) return;
+      meetingPeople.push(teacher);
+      if (currentView === 'meeting') renderMeetingFinder();
+    }
+
+    /** Removes a teacher from the meeting-finder selection and re-renders. */
+    function removeMeetingPerson(scheduleKey) {
+      meetingPeople = meetingPeople.filter(p => p.scheduleKey !== scheduleKey);
+      applyMeetingFilter();
+      renderMeetingFinder();
+    }
+
+    /** Switches between stacked and heatmap display modes and re-renders. */
+    function setMeetingMode(mode) {
+      meetingMode = mode;
+      document.getElementById('btn-meeting-stacked').classList.toggle('active', mode === 'stacked');
+      document.getElementById('btn-meeting-heatmap').classList.toggle('active', mode === 'heatmap');
+      renderMeetingFinder();
+    }
+
+    /**
+     * Returns true if the given teacher has a lesson that overlaps this period
+     * on the specified day, week, and semester. Checks both MSSS and JS schedules
+     * because some staff teach across both schools.
+     */
+    function personIsBusy(person, period, day, week, sem) {
+      const sched = teacherData && teacherData.schedules[person.scheduleKey];
+      if (!sched) return false;
+      const msssBlocks = (sched.msss && sched.msss[sem] && sched.msss[sem][week] && sched.msss[sem][week][day]) || [];
+      const jsBlocks   = (sched.js   && sched.js[sem]   && sched.js[sem]['single'] && sched.js[sem]['single'][day]) || [];
+      return [...msssBlocks, ...jsBlocks].some(
+        b => b.startMin < period.endMin && b.endMin > period.startMin
+      );
+    }
+
+    /**
+     * Renders the meeting-finder grid into #grids.
+     * Shows one grid per MSSS week (A and B), with teaching periods as rows
+     * and days D1–D5 as columns. Each cell shows either coloured strips per
+     * person (stacked mode) or a single heat-coded availability count
+     * (heatmap mode). Cells where everyone is free get a green outline.
+     */
+    function renderMeetingFinder() {
+      const gridsEl = document.getElementById('grids');
+      gridsEl.innerHTML = '';
+
+      if (!teacherData) {
+        gridsEl.innerHTML = '<p class="mf-placeholder">Loading teacher data…</p>';
+        return;
+      }
+
+      if (meetingPeople.length === 0) {
+        gridsEl.innerHTML = '<p class="mf-placeholder">Use the People search above to add staff — their combined availability will appear here.</p>';
+        return;
+      }
+
+      const sem      = currentSem;
+      const periods  = (teacherData.msssPeriods || []).filter(p => !isNonTeaching(p.label));
+      const weeks    = ['A', 'B'];
+      const days     = [1, 2, 3, 4, 5];
+      const dayLabels = ['D1', 'D2', 'D3', 'D4', 'D5'];
+
+      // ── Find best times (everyone free) ────────────────────────────────────
+      const bestSlots = new Set();
+      weeks.forEach(week => {
+        days.forEach(day => {
+          periods.forEach(period => {
+            const allFree = meetingPeople.every(p => !personIsBusy(p, period, day, week, sem));
+            if (allFree) bestSlots.add(`${week}-${day}-${period.period}`);
+          });
+        });
+      });
+
+      // ── Best-times banner ──────────────────────────────────────────────────
+      const bannerEl = document.createElement('div');
+      bannerEl.className = 'mf-best-times';
+      if (bestSlots.size === 0) {
+        bannerEl.classList.add('mf-no-times');
+        bannerEl.innerHTML = '<strong>No common free times</strong> — at least one person is busy in every teaching period.';
+      } else {
+        const chips = [];
+        weeks.forEach(week => {
+          days.forEach((day, di) => {
+            periods.forEach(period => {
+              if (bestSlots.has(`${week}-${day}-${period.period}`)) {
+                chips.push(`<span class="mf-best-chip">Wk ${week} · ${dayLabels[di]} · ${period.label}</span>`);
+              }
+            });
+          });
+        });
+        const shown = chips.slice(0, 10).join('');
+        const extra = chips.length > 10 ? `<span class="mf-more">+${chips.length - 10} more</span>` : '';
+        bannerEl.innerHTML = `<strong>Everyone free:</strong> ${shown}${extra}`;
+      }
+      gridsEl.appendChild(bannerEl);
+
+      // ── People chips ───────────────────────────────────────────────────────
+      const chipsEl = document.createElement('div');
+      chipsEl.className = 'mf-chips';
+      meetingPeople.forEach((person, i) => {
+        const colour = PERSON_COLOURS[i % PERSON_COLOURS.length];
+        const chip = document.createElement('span');
+        chip.className = 'mf-chip';
+        chip.style.background = colour;
+        const removeKey = person.scheduleKey.replace(/'/g, "\\'");
+        chip.innerHTML =
+          `${person.name} <button onclick="removeMeetingPerson('${removeKey}')" title="Remove">✕</button>`;
+        chipsEl.appendChild(chip);
+      });
+      gridsEl.appendChild(chipsEl);
+
+      // ── One grid per week ──────────────────────────────────────────────────
+      weeks.forEach(week => {
+        const section = document.createElement('div');
+        section.className = 'mf-grid-section';
+
+        const heading = document.createElement('div');
+        heading.className = 'mf-week-label';
+        heading.textContent = `Week ${week}`;
+        section.appendChild(heading);
+
+        const table = document.createElement('table');
+        table.className = 'mf-grid';
+
+        // Column widths
+        const colgroup = document.createElement('colgroup');
+        const colPeriod = document.createElement('col');
+        colPeriod.className = 'mf-col-period';
+        colgroup.appendChild(colPeriod);
+        days.forEach(() => {
+          const col = document.createElement('col');
+          colgroup.appendChild(col);
+        });
+        table.appendChild(colgroup);
+
+        // Header row
+        const thead = table.createTHead();
+        const headerRow = thead.insertRow();
+        const thPeriod = document.createElement('th');
+        headerRow.appendChild(thPeriod);
+        dayLabels.forEach(label => {
+          const th = document.createElement('th');
+          th.textContent = label;
+          headerRow.appendChild(th);
+        });
+
+        // Data rows — one per teaching period
+        const tbody = table.createTBody();
+        periods.forEach(period => {
+          const tr = tbody.insertRow();
+
+          // Period label cell
+          const tdLabel = tr.insertCell();
+          tdLabel.className = 'mf-period-label';
+          tdLabel.innerHTML =
+            `<span class="mf-period-name">${period.label}</span>` +
+            `<span class="mf-period-time">${formatTime(period.startMin)}</span>`;
+
+          // Day cells
+          days.forEach((day, di) => {
+            const td = tr.insertCell();
+            const isBest = bestSlots.has(`${week}-${day}-${period.period}`);
+
+            if (meetingMode === 'stacked') {
+              td.className = 'mf-cell-stacked' + (isBest ? ' mf-best-slot' : '');
+              const inner = document.createElement('div');
+              inner.className = 'mf-stacked-inner';
+              meetingPeople.forEach((person, pi) => {
+                const busy = personIsBusy(person, period, day, week, sem);
+                const strip = document.createElement('div');
+                strip.className = 'mf-strip ' + (busy ? 'mf-strip-busy' : 'mf-strip-free');
+                if (busy) strip.style.background = PERSON_COLOURS[pi % PERSON_COLOURS.length];
+                strip.title = person.name + (busy ? ': teaching' : ': free');
+                inner.appendChild(strip);
+              });
+              td.appendChild(inner);
+
+            } else {
+              const freeCount = meetingPeople.filter(p => !personIsBusy(p, period, day, week, sem)).length;
+              const fraction  = freeCount / meetingPeople.length;
+              let heatClass;
+              if (fraction === 1)        heatClass = 'heat-all';
+              else if (fraction >= 0.75) heatClass = 'heat-most';
+              else if (fraction >= 0.5)  heatClass = 'heat-mix';
+              else if (fraction > 0)     heatClass = 'heat-few';
+              else                       heatClass = 'heat-none';
+              td.className = `mf-cell-heat ${heatClass}` + (isBest ? ' mf-best-slot' : '');
+              td.textContent = `${freeCount}/${meetingPeople.length}`;
+            }
+          });
+        });
+
+        table.appendChild(tbody);
+        section.appendChild(table);
+        gridsEl.appendChild(section);
+      });
+
+      // ── Legend ─────────────────────────────────────────────────────────────
+      const legendEl = document.createElement('div');
+      legendEl.className = 'mf-legend';
+      if (meetingMode === 'heatmap') {
+        [
+          ['heat-all',  'All free'],
+          ['heat-most', 'Most free'],
+          ['heat-mix',  'Half free'],
+          ['heat-few',  'Few free'],
+          ['heat-none', 'None free'],
+        ].forEach(([cls, label]) => {
+          const span = document.createElement('span');
+          span.className = `mf-leg ${cls}`;
+          span.textContent = label;
+          legendEl.appendChild(span);
+        });
+      } else {
+        legendEl.innerHTML =
+          `<span class="mf-leg-stacked"><span class="mf-leg-strip mf-strip-free"></span> Free</span>` +
+          `<span class="mf-leg-stacked"><span class="mf-leg-strip" style="background:#1565c0"></span> Teaching</span>`;
+      }
+      gridsEl.appendChild(legendEl);
     }
 
     init();
