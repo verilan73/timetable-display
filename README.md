@@ -107,6 +107,10 @@ appsscript.json  — Apps Script manifest (timezone, runtime)
 test/            — Node test suite (npm test) — dev-only, .claspignore excludes it from deployment
 ```
 
+## Potential future enhancements
+
+- **Duty scheduling** — aSc Timetables can export duty assignments (yard duty, gate duty, etc.) alongside teaching periods. The XML schema already supports duty records, so a future iteration could parse and display them in the "Who is teaching?" view as an additional row per period. This would let Principals see not only which class each teacher is running but also who is on duty in which location — without any changes to the underlying data source.
+
 ## Testing
 
 `npm test` runs a dependency-free Node test suite over the pure-logic parts of both files — no build step, and nothing here is ever pushed to Apps Script. See `CLAUDE.md` for what's covered and why the rest (anything touching `XmlService`, Drive, or the DOM) is verified by hand on `/dev` instead.

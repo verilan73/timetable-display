@@ -774,6 +774,71 @@
       padding: 48px 16px;
       font-size: 14px;
     }
+
+    /* ── Who is teaching ──────────────────────────────────────────────────── */
+    .wit-banner {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .wit-banner strong { font-size: 18px; }
+    .wit-banner-detail { font-size: 12px; opacity: 0.72; }
+    .wit-banner-detail em { font-style: italic; }
+    .wit-banner-empty {
+      background: #f0f2f5;
+      color: #555;
+    }
+    .wit-banner-empty strong { font-size: 15px; }
+
+    .wit-grade-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 14px 0 4px;
+      border-bottom: 2px solid #ccd;
+      margin-bottom: 2px;
+    }
+
+    .wit-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6px;
+    }
+    .wit-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 6px 10px;
+      border-bottom: 2px solid #ccd;
+      background: #f7f8fa;
+    }
+    .wit-table td {
+      padding: 8px 10px;
+      font-size: 13px;
+      border-bottom: 1px solid #eef;
+      vertical-align: middle;
+    }
+    .wit-table tbody tr { border-left: 3px solid transparent; }
+    .wit-table tbody tr:last-child td { border-bottom: none; }
+    .wit-table tbody tr:hover td { background: #f7f8fa; }
+
+    .wit-placeholder {
+      text-align: center;
+      color: #888;
+      padding: 56px 16px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -794,6 +859,7 @@
           <button id="btn-view-subjects"                onclick="setView('subjects')">Subjects</button>
           <button id="btn-view-rooms"                   onclick="setView('rooms')">Rooms</button>
           <button id="btn-view-meeting"                  onclick="setView('meeting')">Find a common time</button>
+          <button id="btn-view-who"                      onclick="setView('who')">Who is teaching?</button>
         </div>
       </div>
       <!-- Class-mode controls: school selector + group/class dropdown.
@@ -907,6 +973,37 @@
           </div>
         </div>
       </div>
+      <!-- Who-is-teaching controls: division + period + day, hidden by default -->
+      <div id="who-controls" style="display:none">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Division</label>
+          <div class="toggle">
+            <button id="btn-who-js"                  onclick="setWhoDivision('JS')">JS</button>
+            <button id="btn-who-ms" class="active"   onclick="setWhoDivision('MS')">MS</button>
+            <button id="btn-who-ss"                  onclick="setWhoDivision('SS')">SS</button>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Period</label>
+          <div id="who-period-toggle" class="toggle">
+            <!-- populated dynamically by buildWhoPeriodPicker() -->
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Day</label>
+          <div class="toggle">
+            <button id="btn-who-today" class="active" onclick="setWhoDay(null)">Today</button>
+            <button id="btn-who-mon"                  onclick="setWhoDay(1)">Mon</button>
+            <button id="btn-who-tue"                  onclick="setWhoDay(2)">Tue</button>
+            <button id="btn-who-wed"                  onclick="setWhoDay(3)">Wed</button>
+            <button id="btn-who-thu"                  onclick="setWhoDay(4)">Thu</button>
+            <button id="btn-who-fri"                  onclick="setWhoDay(5)">Fri</button>
+          </div>
+        </div>
+      </div>
       <!-- Semester toggle — always visible -->
       <div class="control-group">
         <label>Semester</label>
@@ -965,6 +1062,11 @@
     let meetingMode   = 'stacked';   // 'stacked' | 'heatmap'
 
     let currentWeek = null;          // 'A' | 'B' | null — set from getClientConfig at startup
+
+    let whoTeachingDivision  = 'MS'; // 'JS' | 'MS' | 'SS'
+    let whoTeachingPeriodIdx = null; // null = Now; number = index into getWhoPeriods() result
+    let whoTeachingDayCol    = null; // null = Today; 1-5 = specific weekday
+    let allLessons           = [];   // flat list built from teacherData at load time
 
     /** Returns the 1-indexed weekday column (1=Mon … 5=Fri), or null on weekends. */
     function getTodayCol() {
@@ -1270,8 +1372,12 @@
       // Wire up the meeting-finder people search with the same teacher roster.
       wireMeetingSearch(data.teachers);
 
+      // Pre-build the flat lesson index used by the "Who is teaching?" view.
+      allLessons = buildAllLessons(data);
+
       // Re-render only when already in teacher view (not during startup pre-load).
       if (currentView === 'teachers') renderTeacherTimeline();
+      else if (currentView === 'who') renderWhoIsTeaching();
     }
 
     /** Forces a cache-busting reload of subject data from the source XMLs. */
@@ -1669,6 +1775,308 @@
       el.textContent = 'Error: ' + (err.message || JSON.stringify(err));
     }
 
+    // ── Who is teaching ──────────────────────────────────────────────────────
+    // Periods excluded from the "Who is teaching?" period picker.
+    // Advisory is intentionally NOT excluded — teachers are present and
+    // a Principal may want to know who is running each homeroom.
+    const WHO_PICKER_EXCLUDE = new Set([
+      'lunch pt 1','lunch pt 2','lunch 1','lunch 2','break','reg','registration'
+    ]);
+    function isExcludedFromPicker(label) {
+      return WHO_PICKER_EXCLUDE.has((label || '').toLowerCase());
+    }
+
+    /**
+     * Extracts the leading numeric grade from an MSSS class name string
+     * (e.g. "09G" → 9, "10BY" → 10, "6A" → 6).  Returns null if none found.
+     */
+    function parseGradeNum(className) {
+      const m = className.trim().match(/^0*(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+
+    /**
+     * Given an MSSS block's classNames string (comma-separated class codes),
+     * returns 'MS' (grades 6–8) or 'SS' (grades 9–12) based on the lowest
+     * grade number found.  Defaults to 'SS' when no numeric grade is parsed.
+     */
+    function gradeToSection(classNames) {
+      const grades = classNames.split(',')
+        .map(s => parseGradeNum(s))
+        .filter(g => g !== null && g >= 6 && g <= 12);
+      if (!grades.length) return 'SS';
+      return Math.min(...grades) <= 8 ? 'MS' : 'SS';
+    }
+
+    /**
+     * Returns the lowest numeric grade from a classNames string, or null.
+     * Used to group lessons by grade within the results table.
+     */
+    function gradeOfLesson(classNames) {
+      const grades = classNames.split(',')
+        .map(s => parseGradeNum(s))
+        .filter(g => g !== null);
+      return grades.length ? Math.min(...grades) : null;
+    }
+
+    /**
+     * Builds a flat allLessons array from loaded teacherData.  Each entry
+     * carries enough context for the "Who is teaching?" renderer to filter and
+     * display without touching the raw schedules again.
+     */
+    function buildAllLessons(data) {
+      const lessons = [];
+      data.teachers.forEach(teacher => {
+        const sched = data.schedules[teacher.scheduleKey];
+        if (!sched) return;
+        ['S1', 'S2'].forEach(sem => {
+          // MSSS lessons — Week A and B stored separately.
+          if (sched.msss) {
+            ['A', 'B'].forEach(week => {
+              [1, 2, 3, 4, 5].forEach(day => {
+                (sched.msss[sem]?.[week]?.[day] || []).forEach(block => {
+                  lessons.push({
+                    teacher,
+                    source: 'msss',
+                    section: gradeToSection(block.classNames),
+                    sem, week, day,
+                    subject:      block.subject,
+                    subjectShort: block.subjectShort,
+                    classNames:   block.classNames,
+                    roomShort:    block.roomShort,
+                    startMin:     block.startMin,
+                    endMin:       block.endMin,
+                  });
+                });
+              });
+            });
+          }
+          // JS lessons — single week only.
+          if (sched.js) {
+            [1, 2, 3, 4, 5].forEach(day => {
+              (sched.js[sem]?.['single']?.[day] || []).forEach(block => {
+                lessons.push({
+                  teacher,
+                  source:  'js',
+                  section: 'JS',
+                  sem, week: 'single', day,
+                  subject:      block.subject,
+                  subjectShort: block.subjectShort,
+                  classNames:   block.classNames,
+                  roomShort:    block.roomShort,
+                  startMin:     block.startMin,
+                  endMin:       block.endMin,
+                });
+              });
+            });
+          }
+        });
+      });
+      return lessons;
+    }
+
+    /** Returns the teaching periods for the currently-selected division, excluding breaks. */
+    function getWhoPeriods() {
+      if (!teacherData) return [];
+      const src = whoTeachingDivision === 'JS'
+        ? teacherData.jsPeriods
+        : teacherData.msssPeriods;
+      return (src || []).filter(p => !isExcludedFromPicker(p.label));
+    }
+
+    /**
+     * Rebuilds the period-picker button row inside #who-period-toggle,
+     * preserving the active state of whoTeachingPeriodIdx.
+     */
+    function buildWhoPeriodPicker() {
+      const toggle = document.getElementById('who-period-toggle');
+      if (!toggle) return;
+      toggle.innerHTML = '';
+
+      const nowBtn = document.createElement('button');
+      nowBtn.id = 'btn-who-now';
+      nowBtn.textContent = 'Now';
+      nowBtn.onclick = () => setWhoPeriod(null);
+      if (whoTeachingPeriodIdx === null) nowBtn.classList.add('active');
+      toggle.appendChild(nowBtn);
+
+      getWhoPeriods().forEach((period, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = period.label;
+        btn.onclick = () => setWhoPeriod(i);
+        if (whoTeachingPeriodIdx === i) btn.classList.add('active');
+        toggle.appendChild(btn);
+      });
+    }
+
+    function setWhoDivision(div) {
+      whoTeachingDivision  = div;
+      whoTeachingPeriodIdx = null; // reset to Now when division changes
+      ['JS','MS','SS'].forEach(d =>
+        document.getElementById(`btn-who-${d.toLowerCase()}`)
+          ?.classList.toggle('active', d === div)
+      );
+      buildWhoPeriodPicker();
+      renderWhoIsTeaching();
+    }
+
+    function setWhoDay(col) {
+      whoTeachingDayCol = col;
+      const pairs = [[null,'today'],[1,'mon'],[2,'tue'],[3,'wed'],[4,'thu'],[5,'fri']];
+      pairs.forEach(([v, suffix]) =>
+        document.getElementById(`btn-who-${suffix}`)
+          ?.classList.toggle('active', col === v)
+      );
+      renderWhoIsTeaching();
+    }
+
+    function setWhoPeriod(idx) {
+      whoTeachingPeriodIdx = idx;
+      buildWhoPeriodPicker(); // rebuilds with correct active state
+      renderWhoIsTeaching();
+    }
+
+    /**
+     * Renders the "Who is teaching?" view into #grids.
+     * Filters allLessons by division, semester, day, week, and the selected
+     * period; groups results by grade; shows a summary banner at the top.
+     */
+    function renderWhoIsTeaching() {
+      const gridsEl = document.getElementById('grids');
+      gridsEl.innerHTML = '';
+
+      if (!teacherData || allLessons.length === 0) {
+        gridsEl.innerHTML = '<p class="wit-placeholder">Loading teacher data…</p>';
+        return;
+      }
+
+      const dayCol = whoTeachingDayCol === null ? getTodayCol() : whoTeachingDayCol;
+      if (dayCol === null) {
+        gridsEl.innerHTML = '<p class="wit-placeholder">No school today — select a weekday above to look ahead.</p>';
+        return;
+      }
+
+      // Resolve selected period.
+      const periods = getWhoPeriods();
+      const nowMin  = getCurrentMin();
+      let period;
+      if (whoTeachingPeriodIdx === null) {
+        // "Now" — find the period whose time range contains the current minute.
+        period = periods.find(p => nowMin >= p.startMin && nowMin < p.endMin) || null;
+      } else {
+        period = periods[whoTeachingPeriodIdx] || null;
+      }
+
+      if (!period) {
+        const msg = whoTeachingPeriodIdx === null
+          ? 'No lesson in progress right now — select a period above to look ahead.'
+          : 'Period data not available.';
+        gridsEl.innerHTML = `<p class="wit-placeholder">${msg}</p>`;
+        return;
+      }
+
+      const sem     = currentSem;
+      const isJsDiv = whoTeachingDivision === 'JS';
+
+      // If currentWeek is unknown and the division is MSSS, check both weeks
+      // and de-duplicate — a lesson present in both A and B is shown once.
+      const targetWeeks = isJsDiv
+        ? ['single']
+        : (currentWeek ? [currentWeek] : ['A', 'B']);
+
+      let matching = allLessons.filter(l =>
+        l.sem    === sem            &&
+        targetWeeks.includes(l.week) &&
+        l.day    === dayCol         &&
+        l.startMin < period.endMin  &&
+        l.endMin > period.startMin  &&
+        l.section === whoTeachingDivision
+      );
+
+      // De-duplicate when both A and B weeks were searched.
+      if (targetWeeks.length > 1) {
+        const seen = new Set();
+        matching = matching.filter(l => {
+          const key = `${l.teacher.scheduleKey}|${l.startMin}|${l.classNames}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri'];
+      const dayLabel   = DAY_LABELS[dayCol - 1];
+      const divLabel   = { JS: 'Junior School', MS: 'Middle School', SS: 'Senior School' }[whoTeachingDivision];
+
+      // Summary banner.
+      const banner = document.createElement('div');
+      banner.className = 'wit-banner' + (matching.length === 0 ? ' wit-banner-empty' : '');
+
+      if (matching.length === 0) {
+        banner.innerHTML = `<strong>No sessions found</strong>
+          <span class="wit-banner-detail">${divLabel} · ${period.label} · ${dayLabel}</span>`;
+        gridsEl.appendChild(banner);
+        return;
+      }
+
+      const weekNote = targetWeeks.length > 1
+        ? ' · <em>week unknown — showing A &amp; B combined</em>'
+        : '';
+      banner.innerHTML = `
+        <strong>${matching.length} session${matching.length !== 1 ? 's' : ''}</strong>
+        <span class="wit-banner-detail">${divLabel} · ${period.label} · ${dayLabel}${weekNote}</span>`;
+      gridsEl.appendChild(banner);
+
+      if (isJsDiv) {
+        // JS: single flat table, sorted by class name.
+        const sorted = [...matching].sort((a, b) => a.classNames.localeCompare(b.classNames));
+        gridsEl.appendChild(buildWitTable(sorted));
+      } else {
+        // MS / SS: group by numeric grade.
+        const grouped = new Map();
+        matching.forEach(l => {
+          const grade = gradeOfLesson(l.classNames) ?? 999;
+          if (!grouped.has(grade)) grouped.set(grade, []);
+          grouped.get(grade).push(l);
+        });
+        [...grouped.keys()].sort((a, b) => a - b).forEach(grade => {
+          const header = document.createElement('div');
+          header.className = 'wit-grade-header';
+          header.textContent = grade !== 999 ? `Grade ${grade}` : 'Other';
+          gridsEl.appendChild(header);
+          const rows = grouped.get(grade)
+            .sort((a, b) => a.classNames.localeCompare(b.classNames));
+          gridsEl.appendChild(buildWitTable(rows));
+        });
+      }
+    }
+
+    /**
+     * Builds a <table> row for each lesson in `lessons`.
+     * The left border is colour-coded by subject to give a quick visual scan.
+     */
+    function buildWitTable(lessons) {
+      const table = document.createElement('table');
+      table.className = 'wit-table';
+      const thead = table.createTHead();
+      const hr = thead.insertRow();
+      ['Teacher', 'Subject', 'Class', 'Room'].forEach(label => {
+        const th = document.createElement('th');
+        th.textContent = label;
+        hr.appendChild(th);
+      });
+      const tbody = table.createTBody();
+      lessons.forEach(l => {
+        const tr = tbody.insertRow();
+        tr.style.borderLeftColor = subjectColour(l.subjectShort);
+        [l.teacher.name, l.subject, l.classNames, l.roomShort || '—'].forEach(text => {
+          const td = tr.insertCell();
+          td.textContent = text;
+        });
+      });
+      return table;
+    }
+
     // ── View toggle ───────────────────────────────────────────────────────────
     function setView(view) {
       currentView = view;
@@ -1677,11 +2085,13 @@
       document.getElementById('btn-view-subjects').classList.toggle('active', view === 'subjects');
       document.getElementById('btn-view-rooms').classList.toggle('active',    view === 'rooms');
       document.getElementById('btn-view-meeting').classList.toggle('active',  view === 'meeting');
+      document.getElementById('btn-view-who').classList.toggle('active',      view === 'who');
       document.getElementById('class-controls').style.display   = view === 'classes'  ? 'contents' : 'none';
       document.getElementById('teacher-controls').style.display = view === 'teachers' ? 'contents' : 'none';
       document.getElementById('subject-controls').style.display = view === 'subjects' ? 'contents' : 'none';
       document.getElementById('room-controls').style.display    = view === 'rooms'    ? 'contents' : 'none';
       document.getElementById('meeting-controls').style.display = view === 'meeting'  ? 'contents' : 'none';
+      document.getElementById('who-controls').style.display     = view === 'who'      ? 'contents' : 'none';
       // The subject-highlight legend only makes sense in Classes view, where
       // several subjects are visible at once — the other views already scope
       // to one selected entity.
@@ -1692,6 +2102,7 @@
       else if (view === 'subjects') renderSubjectTimeline();
       else if (view === 'rooms')    renderRoomTimeline();
       else if (view === 'meeting')  renderMeetingFinder();
+      else if (view === 'who')      { buildWhoPeriodPicker(); renderWhoIsTeaching(); }
       else                          renderGrid();
     }
 
@@ -1705,6 +2116,7 @@
       else if (currentView === 'subjects') renderSubjectTimeline();
       else if (currentView === 'rooms')    renderRoomTimeline();
       else if (currentView === 'meeting')  renderMeetingFinder();
+      else if (currentView === 'who')      renderWhoIsTeaching();
       else                                 renderGrid();
     }
 
@@ -2703,6 +3115,7 @@
       else if (currentView === 'subjects') renderSubjectTimeline();
       else if (currentView === 'rooms')    renderRoomTimeline();
       else if (currentView === 'meeting')  renderMeetingFinder();
+      else if (currentView === 'who')      renderWhoIsTeaching();
       else                                 renderGrid();
     }, 5 * 60 * 1000);
 
