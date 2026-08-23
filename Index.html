@@ -831,8 +831,8 @@
     }
     .wit-table tbody tr { border-left: 3px solid transparent; }
     .wit-table tbody tr:last-child td { border-bottom: none; }
-    .wit-table tbody tr:nth-child(even) td { background: #f4f5f8; }
-    .wit-table tbody tr:hover td { background: #e8eaf2; }
+    .wit-table tbody tr:nth-child(even) td { background: #e4e6f0; }
+    .wit-table tbody tr:hover td { background: #d4d7e8; }
 
     .wit-sort-arrow { font-size: 10px; opacity: 0.45; margin-left: 4px; }
     .wit-table th { cursor: pointer; }
@@ -2037,28 +2037,9 @@
         <span class="wit-banner-detail">${divLabel} · ${period.label} · ${dayLabel}${weekNote}</span>`;
       gridsEl.appendChild(banner);
 
-      if (isJsDiv) {
-        // JS: single flat table, sorted by class name.
-        const sorted = [...matching].sort((a, b) => a.classNames.localeCompare(b.classNames));
-        gridsEl.appendChild(buildWitTable(sorted));
-      } else {
-        // MS / SS: group by numeric grade.
-        const grouped = new Map();
-        matching.forEach(l => {
-          const grade = gradeOfLesson(l.classNames) ?? 999;
-          if (!grouped.has(grade)) grouped.set(grade, []);
-          grouped.get(grade).push(l);
-        });
-        [...grouped.keys()].sort((a, b) => a - b).forEach(grade => {
-          const header = document.createElement('div');
-          header.className = 'wit-grade-header';
-          header.textContent = grade !== 999 ? `Grade ${grade}` : 'Other';
-          gridsEl.appendChild(header);
-          const rows = grouped.get(grade)
-            .sort((a, b) => a.classNames.localeCompare(b.classNames));
-          gridsEl.appendChild(buildWitTable(rows));
-        });
-      }
+      // All divisions: single flat table sorted by class name.
+      const sorted = [...matching].sort((a, b) => a.classNames.localeCompare(b.classNames));
+      gridsEl.appendChild(buildWitTable(sorted));
     }
 
     // Tracks current sort state per table so click-toggling works.
