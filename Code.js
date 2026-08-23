@@ -57,7 +57,55 @@ function getConfig() {
  */
 function getClientConfig() {
   const { logoUrl, logoAlt } = getConfig();
-  return { logoUrl, logoAlt };
+  const weekInfo = getCurrentWeekInfo();
+  return { logoUrl, logoAlt, currentWeek: weekInfo.week };
+}
+
+/**
+ * Looks up the Monday event in WEEK_CALENDAR_NAME to determine whether the
+ * current school week is a Week A or Week B rotation. Returns null for the
+ * week letter when the calendar has no matching event (holiday, half-term, etc.)
+ * or when the property is not configured.
+ *
+ * Result is cached in CacheService for one hour so the Calendar API is not
+ * called on every page load.
+ *
+ * @returns {{ week: 'A'|'B'|null }}
+ */
+function getCurrentWeekInfo() {
+  try {
+    const cache  = CacheService.getScriptCache();
+    const cached = cache.get('current_week_info');
+    if (cached) return JSON.parse(cached);
+
+    const calName = PropertiesService.getScriptProperties().getProperty('WEEK_CALENDAR_NAME') || '';
+    if (!calName) return { week: null };
+
+    const calendars = CalendarApp.getCalendarsByName(calName);
+    if (!calendars.length) return { week: null };
+
+    // Find Monday of the current week. getDay() returns 0=Sun … 6=Sat.
+    const now    = new Date();
+    const offset = now.getDay() === 0 ? -6 : 1 - now.getDay();  // days back to Monday
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + offset);
+    monday.setHours(0, 0, 0, 0);
+    const tuesday = new Date(monday);
+    tuesday.setDate(monday.getDate() + 1);
+
+    const events = calendars[0].getEvents(monday, tuesday);
+    let weekLetter = null;
+    for (const ev of events) {
+      const m = ev.getTitle().match(/Week\s+\d+\s*\(([AB])\)/i);
+      if (m) { weekLetter = m[1].toUpperCase(); break; }
+    }
+
+    const result = { week: weekLetter };
+    cache.put('current_week_info', JSON.stringify(result), 3600);
+    return result;
+  } catch (e) {
+    return { week: null };
+  }
 }
 
 /**
@@ -73,9 +121,10 @@ function setupConfig() {
     TIMETABLE_FOLDER_ID: 'YOUR_DRIVE_FOLDER_ID',
     MSSS_FILENAME:       'MSSS Schedule.xml',
     JS_FILENAME:         'JS Schedule.xml',
-    FAVICON_URL:         '',
-    LOGO_URL:            '',
-    LOGO_ALT:            'School logo',
+    FAVICON_URL:          '',
+    LOGO_URL:             '',
+    LOGO_ALT:             'School logo',
+    WEEK_CALENDAR_NAME:   '',   // name of the Google Calendar whose Monday events identify the A/B week
   };
   Object.entries(defaults).forEach(([k, v]) => {
     if (!props.getProperty(k)) props.setProperty(k, v);
@@ -242,9 +291,7 @@ function buildTimetableData(doc) {
   const schemaType = detectSchema(root);
   // JS has a single Mon–Fri week; MSSS alternates between Week A and Week B.
   const weeksMode = schemaType === 'JS' ? 'single' : 'AB';
-  const dayLabels = schemaType === 'JS'
-    ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-    : ['D1',  'D2',  'D3',  'D4',  'D5'];
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
   const periods    = parsePeriods(root);
   const subjects   = parseSection(root, 'subjects',   'subject');

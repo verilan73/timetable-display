@@ -605,6 +605,38 @@
     .lesson-stack-item-header { font-weight: 700; font-size: 12.5px; color: #1a1a2e; }
     .lesson-stack-item-detail { font-size: 11px; color: rgba(0,0,0,0.75); margin-top: 2px; }
 
+    /* ── Current-time indicator ────────────────────────────────────────────── */
+    /* Red line in timeline views — absolutely positioned within a .tl-day-col. */
+    .tl-now-line {
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: #e53935;
+      z-index: 20;
+      pointer-events: none;
+    }
+    /* Dot on the left edge of the red line */
+    .tl-now-line::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      top: -3px;
+      width: 8px; height: 8px;
+      background: #e53935;
+      border-radius: 50%;
+    }
+    /* Current-day column highlight in classes and meeting-finder grids */
+    .timetable th.current-day,
+    .mf-grid th.current-day   { background: #4a0e2b !important; } /* deeper maroon */
+    /* Current-period row highlight */
+    .timetable tr.current-period td.grid-cell,
+    .timetable tr.current-period td.period-label { border-top: 2px solid #e53935; }
+    /* Cell at the intersection of today's column and the current period */
+    .timetable tr.current-period td.current-day { background: rgba(229,57,53,0.06); }
+    /* Meeting finder equivalents */
+    .mf-grid tr.current-period td { border-top: 2px solid #e53935; }
+    .mf-grid td.current-day-now   { outline: 2px solid #e53935; outline-offset: -2px; }
+
     /* ── Meeting finder ────────────────────────────────────────────────────── */
     .mf-best-times {
       border-radius: 8px;
@@ -932,6 +964,19 @@
     let meetingPeople = [];          // teacher objects currently selected in meeting finder
     let meetingMode   = 'stacked';   // 'stacked' | 'heatmap'
 
+    let currentWeek = null;          // 'A' | 'B' | null — set from getClientConfig at startup
+
+    /** Returns the 1-indexed weekday column (1=Mon … 5=Fri), or null on weekends. */
+    function getTodayCol() {
+      const d = new Date().getDay();
+      return d >= 1 && d <= 5 ? d : null;
+    }
+    /** Returns the current time in minutes since midnight. */
+    function getCurrentMin() {
+      const n = new Date();
+      return n.getHours() * 60 + n.getMinutes();
+    }
+
     // ── Colours ───────────────────────────────────────────────────────────────
     // Lookups are always case-insensitive (see subjectColour) — the two XML
     // exports don't agree on capitalization for the same subject, so keys
@@ -1035,6 +1080,8 @@
           logo.alt   = clientConfig.logoAlt || 'School logo';
           logo.style.display = '';
         }
+        // currentWeek is 'A', 'B', or null (holiday/unconfigured).
+        if (clientConfig) currentWeek = clientConfig.currentWeek || null;
         allData.MSSS = msss;
         allData.JS   = js;
         onTeacherDataLoaded(teachers);
@@ -1729,8 +1776,7 @@
 
       // weekKeys: ['A','B'] for MSSS, ['single'] for JS.
       const weekKeys  = timetableData.weeksMode === 'AB' ? ['A', 'B'] : ['single'];
-      // dayLabels: ['D1'…'D5'] for MSSS, ['Mon'…'Fri'] for JS.
-      const dayLabels = timetableData.dayLabels || ['D1','D2','D3','D4','D5'];
+      const dayLabels = timetableData.dayLabels || ['Mon','Tue','Wed','Thu','Fri'];
 
       weekKeys.forEach(week => {
         const weekData = semData?.[week];
@@ -1759,9 +1805,18 @@
         const thCorner = document.createElement('th');
         thCorner.className = 'th-period';
         headRow.appendChild(thCorner);
+        // Determine whether to show the now-indicator on this grid.
+        // For MSSS (AB weeks): only on the grid whose week matches currentWeek.
+        // For JS (single week): always show.
+        const todayCol  = getTodayCol();
+        const nowMin    = getCurrentMin();
+        const showNow   = todayCol !== null &&
+          (week === 'single' || week === currentWeek);
+
         DAYS.forEach((d, i) => {
           const th = document.createElement('th');
-          th.textContent = dayLabels[i] || `D${d}`;
+          th.textContent = dayLabels[i];
+          if (showNow && d === todayCol) th.classList.add('current-day');
           headRow.appendChild(th);
         });
         thead.appendChild(headRow);
@@ -1773,6 +1828,10 @@
           const h  = rowHeight(period.durationMin);
           const tr = document.createElement('tr');
           if (isNonTeaching(period.label)) tr.classList.add('non-teaching');
+          const periodIsNow = showNow &&
+            !isNonTeaching(period.label) &&
+            nowMin >= period.startMin && nowMin < period.endMin;
+          if (periodIsNow) tr.classList.add('current-period');
 
           // Period label — height forces consistent row height across all cells
           const tdLabel = document.createElement('td');
@@ -1787,7 +1846,8 @@
           DAYS.forEach(day => {
             const slots = weekData?.[day]?.[period.period] || [];
             const td    = document.createElement('td');
-            td.className = 'grid-cell' + (slots.length === 0 ? ' empty' : '');
+            const isDayNow = showNow && day === todayCol;
+            td.className = 'grid-cell' + (slots.length === 0 ? ' empty' : '') + (isDayNow ? ' current-day' : '');
 
             /*
              * cell-frame: fixed height + overflow:hidden.
@@ -1982,11 +2042,7 @@
        */
       const splitBySource = hasMsss && hasJs;
 
-      const dayLabels = splitBySource
-        ? ['D1 / Mon', 'D2 / Tue', 'D3 / Wed', 'D4 / Thu', 'D5 / Fri']
-        : hasMsss
-          ? ['D1', 'D2', 'D3', 'D4', 'D5']
-          : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+      const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
       if (hasMsss) {
         // Show one block per MSSS week, merging JS lessons into the same columns.
@@ -2005,7 +2061,7 @@
 
           gridsEl.appendChild(buildTimelineSection(
             `Week ${week}`, dayData, dayLabels, splitBySource,
-            rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods
+            rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods, week
           ));
         });
       } else {
@@ -2017,7 +2073,7 @@
         }
         gridsEl.appendChild(buildTimelineSection(
           'Schedule', dayData, dayLabels, false,
-          rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods
+          rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods, null
         ));
       }
     }
@@ -2081,7 +2137,7 @@
      * so that overlapping blocks reveal scheduling conflicts without hiding either.
      */
     function buildTimelineSection(title, dayData, dayLabels, splitBySource,
-        rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods) {
+        rangeStart, totalMin, containerH, guides, jsPeriods, msssPeriods, weekLetter) {
 
       const block = document.createElement('div');
       block.className = 'week-block';
@@ -2124,6 +2180,20 @@
           line.style.top = pct + '%';
           col.appendChild(line);
         });
+
+        // Current-time red line — shown on today's column in the matching week.
+        // weekLetter=null means a JS-only single-week section (always show on any weekday).
+        const tlTodayCol = getTodayCol();
+        const tlNowMin   = getCurrentMin();
+        const tlWeekMatch = weekLetter === null
+          ? true
+          : currentWeek === weekLetter;
+        if (tlTodayCol === d && tlWeekMatch && tlNowMin >= rangeStart && tlNowMin <= rangeStart + totalMin) {
+          const nowLine = document.createElement('div');
+          nowLine.className = 'tl-now-line';
+          nowLine.style.top = ((tlNowMin - rangeStart) / totalMin * 100) + '%';
+          col.appendChild(nowLine);
+        }
 
         // Centre divider line — marks the MS/JS boundary when both are present.
         if (splitBySource) {
@@ -2402,8 +2472,11 @@
     function personIsBusy(person, period, day, week, sem) {
       const sched = teacherData && teacherData.schedules[person.scheduleKey];
       if (!sched) return false;
-      const msssBlocks = (sched.msss && sched.msss[sem] && sched.msss[sem][week] && sched.msss[sem][week][day]) || [];
-      const jsBlocks   = (sched.js   && sched.js[sem]   && sched.js[sem]['single'] && sched.js[sem]['single'][day]) || [];
+      // week==='single' means a JS-only grid; skip the MSSS schedule entirely.
+      const msssBlocks = (week !== 'single' && sched.msss && sched.msss[sem] && sched.msss[sem][week])
+        ? (sched.msss[sem][week][day] || []) : [];
+      const jsBlocks   = (sched.js && sched.js[sem] && sched.js[sem]['single'])
+        ? (sched.js[sem]['single'][day] || []) : [];
       return [...msssBlocks, ...jsBlocks].some(
         b => b.startMin < period.endMin && b.endMin > period.startMin
       );
@@ -2411,10 +2484,11 @@
 
     /**
      * Renders the meeting-finder grid into #grids.
-     * Shows one grid per MSSS week (A and B), with teaching periods as rows
-     * and days D1–D5 as columns. Each cell shows either coloured strips per
-     * person (stacked mode) or a single heat-coded availability count
-     * (heatmap mode). Cells where everyone is free get a green outline.
+     * When all selected people are JS-only (no MSSS schedule), shows one
+     * "Schedule" grid using JS period times. Otherwise shows Week A and Week B
+     * using MSSS periods, since MSSS teachers have different lessons each week.
+     * Each cell shows coloured availability strips (stacked) or a heat-coded
+     * fraction count (heatmap). Cells where everyone is free get a green outline.
      */
     function renderMeetingFinder() {
       const gridsEl = document.getElementById('grids');
@@ -2430,11 +2504,20 @@
         return;
       }
 
-      const sem      = currentSem;
-      const periods  = (teacherData.msssPeriods || []).filter(p => !isNonTeaching(p.label));
-      const weeks    = ['A', 'B'];
-      const days     = [1, 2, 3, 4, 5];
-      const dayLabels = ['D1', 'D2', 'D3', 'D4', 'D5'];
+      const sem     = currentSem;
+      const days    = [1, 2, 3, 4, 5];
+      const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+      // If everyone is JS-only, use JS period times and a single grid.
+      const jsOnly = meetingPeople.every(p => {
+        const sched = teacherData.schedules[p.scheduleKey];
+        return sched && !sched.msss;
+      });
+      const periods = (jsOnly
+        ? (teacherData.jsPeriods || [])
+        : (teacherData.msssPeriods || [])
+      ).filter(p => !isNonTeaching(p.label));
+      const weeks = jsOnly ? ['single'] : ['A', 'B'];
 
       // ── Find best times (everyone free) ────────────────────────────────────
       const bestSlots = new Set();
@@ -2486,14 +2569,21 @@
       gridsEl.appendChild(chipsEl);
 
       // ── One grid per week ──────────────────────────────────────────────────
+      const mfTodayCol = getTodayCol();
+      const mfNowMin   = getCurrentMin();
+
       weeks.forEach(week => {
         const section = document.createElement('div');
         section.className = 'mf-grid-section';
 
         const heading = document.createElement('div');
         heading.className = 'mf-week-label';
-        heading.textContent = `Week ${week}`;
+        heading.textContent = week === 'single' ? 'Schedule' : `Week ${week}`;
         section.appendChild(heading);
+
+        // Whether to show the now-indicator on this particular grid.
+        const showNowMf = mfTodayCol !== null &&
+          (week === 'single' || week === currentWeek);
 
         const table = document.createElement('table');
         table.className = 'mf-grid';
@@ -2514,9 +2604,10 @@
         const headerRow = thead.insertRow();
         const thPeriod = document.createElement('th');
         headerRow.appendChild(thPeriod);
-        dayLabels.forEach(label => {
+        dayLabels.forEach((label, di) => {
           const th = document.createElement('th');
           th.textContent = label;
+          if (showNowMf && days[di] === mfTodayCol) th.classList.add('current-day');
           headerRow.appendChild(th);
         });
 
@@ -2524,6 +2615,9 @@
         const tbody = table.createTBody();
         periods.forEach(period => {
           const tr = tbody.insertRow();
+          const periodIsNow = showNowMf &&
+            mfNowMin >= period.startMin && mfNowMin < period.endMin;
+          if (periodIsNow) tr.classList.add('current-period');
 
           // Period label cell
           const tdLabel = tr.insertCell();
@@ -2536,9 +2630,12 @@
           days.forEach((day, di) => {
             const td = tr.insertCell();
             const isBest = bestSlots.has(`${week}-${day}-${period.period}`);
+            const isNowCell = periodIsNow && showNowMf && day === mfTodayCol;
 
             if (meetingMode === 'stacked') {
-              td.className = 'mf-cell-stacked' + (isBest ? ' mf-best-slot' : '');
+              td.className = 'mf-cell-stacked' +
+                (isBest ? ' mf-best-slot' : '') +
+                (isNowCell ? ' current-day-now' : '');
               const inner = document.createElement('div');
               inner.className = 'mf-stacked-inner';
               meetingPeople.forEach((person, pi) => {
@@ -2560,7 +2657,9 @@
               else if (fraction >= 0.5)  heatClass = 'heat-mix';
               else if (fraction > 0)     heatClass = 'heat-few';
               else                       heatClass = 'heat-none';
-              td.className = `mf-cell-heat ${heatClass}` + (isBest ? ' mf-best-slot' : '');
+              td.className = `mf-cell-heat ${heatClass}` +
+                (isBest ? ' mf-best-slot' : '') +
+                (isNowCell ? ' current-day-now' : '');
               td.textContent = `${freeCount}/${meetingPeople.length}`;
             }
           });
@@ -2594,6 +2693,18 @@
       }
       gridsEl.appendChild(legendEl);
     }
+
+    // Refresh the current-time indicators every 5 minutes. All data is already
+    // in memory so re-renders are instant; this keeps the "now" line accurate
+    // as the school day progresses without requiring a full page reload.
+    setInterval(() => {
+      if (!timetableData && !teacherData) return;
+      if      (currentView === 'teachers') renderTeacherTimeline();
+      else if (currentView === 'subjects') renderSubjectTimeline();
+      else if (currentView === 'rooms')    renderRoomTimeline();
+      else if (currentView === 'meeting')  renderMeetingFinder();
+      else                                 renderGrid();
+    }, 5 * 60 * 1000);
 
     init();
   </script>
