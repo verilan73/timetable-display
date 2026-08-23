@@ -831,7 +831,14 @@
     }
     .wit-table tbody tr { border-left: 3px solid transparent; }
     .wit-table tbody tr:last-child td { border-bottom: none; }
-    .wit-table tbody tr:hover td { background: #f7f8fa; }
+    .wit-table tbody tr:nth-child(even) td { background: #f4f5f8; }
+    .wit-table tbody tr:hover td { background: #e8eaf2; }
+
+    .wit-sort-arrow { font-size: 10px; opacity: 0.45; margin-left: 4px; }
+    .wit-table th { cursor: pointer; }
+    .wit-table th:hover { background: #eaecf2; }
+    .wit-table th.wit-sorted { background: #e4e6f0; }
+    .wit-table th.wit-sorted .wit-sort-arrow { opacity: 1; }
 
     .wit-placeholder {
       text-align: center;
@@ -1787,12 +1794,15 @@
     }
 
     /**
-     * Extracts the leading numeric grade from an MSSS class name string
-     * (e.g. "09G" → 9, "10BY" → 10, "6A" → 6).  Returns null if none found.
+     * Extracts the first number in the 6–12 range from an MSSS class short
+     * code, regardless of letter prefix.  Handles formats like "6A", "09G",
+     * "G6A", "MS6B", "Y10A".  Returns null when no valid grade is found.
+     * The 6–12 filter also prevents group-number digits (e.g. "1" in "TG1")
+     * from being mistaken for a grade.
      */
     function parseGradeNum(className) {
-      const m = className.trim().match(/^0*(\d+)/);
-      return m ? parseInt(m[1], 10) : null;
+      const nums = [...className.matchAll(/\d+/g)].map(m => parseInt(m[0], 10));
+      return nums.find(n => n >= 6 && n <= 12) ?? null;
     }
 
     /**
@@ -1803,13 +1813,13 @@
     function gradeToSection(classNames) {
       const grades = classNames.split(',')
         .map(s => parseGradeNum(s))
-        .filter(g => g !== null && g >= 6 && g <= 12);
+        .filter(g => g !== null);
       if (!grades.length) return 'SS';
       return Math.min(...grades) <= 8 ? 'MS' : 'SS';
     }
 
     /**
-     * Returns the lowest numeric grade from a classNames string, or null.
+     * Returns the lowest valid MSSS grade from a classNames string, or null.
      * Used to group lessons by grade within the results table.
      */
     function gradeOfLesson(classNames) {
@@ -2051,20 +2061,28 @@
       }
     }
 
+    // Tracks current sort state per table so click-toggling works.
+    const witSortState = new WeakMap();
+
     /**
-     * Builds a <table> row for each lesson in `lessons`.
-     * The left border is colour-coded by subject to give a quick visual scan.
+     * Builds a <table> for `lessons` with colour-coded left borders and
+     * click-to-sort column headers.  Clicking a header sorts ascending;
+     * clicking the same header again reverses the sort.
      */
     function buildWitTable(lessons) {
       const table = document.createElement('table');
       table.className = 'wit-table';
+
       const thead = table.createTHead();
       const hr = thead.insertRow();
-      ['Teacher', 'Subject', 'Class', 'Room'].forEach(label => {
+      ['Teacher', 'Subject', 'Class', 'Room'].forEach((label, colIdx) => {
         const th = document.createElement('th');
-        th.textContent = label;
+        th.innerHTML = `${label} <span class="wit-sort-arrow">⇅</span>`;
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => sortWitTable(table, colIdx));
         hr.appendChild(th);
       });
+
       const tbody = table.createTBody();
       lessons.forEach(l => {
         const tr = tbody.insertRow();
@@ -2074,7 +2092,33 @@
           td.textContent = text;
         });
       });
+
       return table;
+    }
+
+    /**
+     * Sorts a .wit-table by the given column index.
+     * Clicking the already-sorted column reverses the sort direction.
+     */
+    function sortWitTable(table, colIdx) {
+      const state = witSortState.get(table) || { col: -1, asc: true };
+      const asc   = state.col === colIdx ? !state.asc : true;
+      witSortState.set(table, { col: colIdx, asc });
+
+      const tbody = table.querySelector('tbody');
+      const rows  = [...tbody.querySelectorAll('tr')];
+      rows.sort((a, b) => {
+        const at = a.cells[colIdx]?.textContent || '';
+        const bt = b.cells[colIdx]?.textContent || '';
+        return asc ? at.localeCompare(bt) : bt.localeCompare(at);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+
+      table.querySelectorAll('th').forEach((th, i) => {
+        th.classList.toggle('wit-sorted', i === colIdx);
+        const arrow = th.querySelector('.wit-sort-arrow');
+        if (arrow) arrow.textContent = i === colIdx ? (asc ? '↑' : '↓') : '⇅';
+      });
     }
 
     // ── View toggle ───────────────────────────────────────────────────────────
