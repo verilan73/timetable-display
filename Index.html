@@ -1075,6 +1075,8 @@
     let whoTeachingDayCol    = null; // null = Today; 1-5 = specific weekday
     let allLessons           = [];   // flat list built from teacherData at load time
 
+    let startupView = null;          // set from URL params, consumed once on first render
+
     /** Returns the 1-indexed weekday column (1=Mon … 5=Fri), or null on weekends. */
     function getTodayCol() {
       const d = new Date().getDay();
@@ -1165,6 +1167,64 @@
       });
     }
 
+    // ── URL state persistence ─────────────────────────────────────────────────
+    /**
+     * Reads view state from URL query params and seeds the matching JS state
+     * variables and button active classes before any render.  Returns the
+     * requested view name (defaulting to 'classes' if absent or unrecognised),
+     * which init() stores in startupView for onDataLoaded to consume.
+     *
+     * Supported params:
+     *   view   — 'classes' | 'teachers' | 'subjects' | 'rooms' | 'meeting' | 'who'
+     *   sem    — 'S1' | 'S2'
+     *   school — 'MSSS' | 'JS'   (classes view only)
+     *   div    — 'JS' | 'MS' | 'SS'  (who-is-teaching view only)
+     */
+    function readUrlParams() {
+      const p = new URLSearchParams(window.location.search);
+
+      const sem = p.get('sem');
+      if (sem === 'S1' || sem === 'S2') {
+        currentSem = sem;
+        document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
+        document.getElementById('btn-s2').classList.toggle('active', sem === 'S2');
+      }
+
+      const school = p.get('school');
+      if (school === 'MSSS' || school === 'JS') {
+        currentSchedule = school;
+        document.getElementById('btn-msss').classList.toggle('active', school === 'MSSS');
+        document.getElementById('btn-js').classList.toggle('active',   school === 'JS');
+      }
+
+      const div = p.get('div');
+      if (['JS','MS','SS'].includes(div)) {
+        whoTeachingDivision = div;
+        ['JS','MS','SS'].forEach(d =>
+          document.getElementById(`btn-who-${d.toLowerCase()}`)
+            ?.classList.toggle('active', d === div)
+        );
+      }
+
+      const view = p.get('view');
+      const VALID = new Set(['classes','teachers','subjects','rooms','meeting','who']);
+      return VALID.has(view) ? view : 'classes';
+    }
+
+    /**
+     * Writes the current view state back to the URL as query params using
+     * replaceState (no history entry).  Called after every user-initiated
+     * state change so the address bar stays bookmarkable.
+     */
+    function updateUrl() {
+      const params = new URLSearchParams();
+      params.set('view', currentView);
+      params.set('sem',  currentSem);
+      if (currentView === 'classes') params.set('school', currentSchedule);
+      if (currentView === 'who')     params.set('div',    whoTeachingDivision);
+      history.replaceState(null, '', window.location.pathname + '?' + params.toString());
+    }
+
     /**
      * Fetches MSSS data, JS data, and teacher data in parallel so every
      * subsequent view or school switch is an instant client-side re-render.
@@ -1174,6 +1234,9 @@
         onError({ message: 'Not running inside Apps Script.' });
         return;
       }
+      // Read URL params before any data loads so state variables and button
+      // classes are correct when the first render fires inside onDataLoaded.
+      startupView = readUrlParams();
       try {
         const [msss, js, teachers, subjects, rooms, clientConfig] = await Promise.all([
           gsRun('getTimetableData', 'MSSS'),
@@ -1196,7 +1259,8 @@
         onTeacherDataLoaded(teachers);
         onSubjectDataLoaded(subjects);
         onRoomDataLoaded(rooms);
-        onDataLoaded(msss);
+        // Use allData[currentSchedule] so a ?school=JS URL starts in JS view.
+        onDataLoaded(allData[currentSchedule]);
       } catch (err) {
         onError(err);
       }
@@ -1209,6 +1273,7 @@
       document.getElementById('btn-js').classList.toggle('active',   schedule === 'JS');
       currentTg = null;
       activeFilters.clear();
+      updateUrl();
       onDataLoaded(allData[schedule]);
     }
 
@@ -1756,7 +1821,15 @@
 
       document.getElementById('loading').style.display = 'none';
       document.getElementById('app').style.display = 'block';
-      renderGrid();
+      // On first load, honour the URL-requested view; on school switches
+      // (subsequent calls), startupView is null and we stay in Classes.
+      if (startupView) {
+        const v = startupView;
+        startupView = null;
+        setView(v);
+      } else {
+        renderGrid();
+      }
     }
 
     // Steps to the previous/next option in the Group/Class dropdown, in the
@@ -1933,6 +2006,7 @@
         document.getElementById(`btn-who-${d.toLowerCase()}`)
           ?.classList.toggle('active', d === div)
       );
+      updateUrl();
       buildWhoPeriodPicker();
       renderWhoIsTeaching();
     }
@@ -2113,6 +2187,7 @@
     // ── View toggle ───────────────────────────────────────────────────────────
     function setView(view) {
       currentView = view;
+      updateUrl();
       document.getElementById('btn-view-classes').classList.toggle('active',  view === 'classes');
       document.getElementById('btn-view-teachers').classList.toggle('active', view === 'teachers');
       document.getElementById('btn-view-subjects').classList.toggle('active', view === 'subjects');
@@ -2144,6 +2219,7 @@
       currentSem = sem;
       document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
       document.getElementById('btn-s2').classList.toggle('active', sem === 'S2');
+      updateUrl();
 
       if (currentView === 'teachers')      renderTeacherTimeline();
       else if (currentView === 'subjects') renderSubjectTimeline();
