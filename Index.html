@@ -1789,6 +1789,13 @@
     const WHO_PICKER_EXCLUDE = new Set([
       'lunch pt 1','lunch pt 2','lunch 1','lunch 2','break','reg','registration'
     ]);
+
+    // Subjects excluded from "Who is teaching?" results. These are
+    // whole-staff collaborative or administrative blocks that appear as
+    // lessons in the XML but don't represent a teacher delivering a class.
+    const WHO_SUBJECT_EXCLUDE = new Set([
+      'collaboration time', 'collab time (hrm)'
+    ]);
     function isExcludedFromPicker(label) {
       return WHO_PICKER_EXCLUDE.has((label || '').toLowerCase());
     }
@@ -2000,7 +2007,8 @@
         l.day    === dayCol         &&
         l.startMin < period.endMin  &&
         l.endMin > period.startMin  &&
-        l.section === whoTeachingDivision
+        l.section === whoTeachingDivision &&
+        !WHO_SUBJECT_EXCLUDE.has((l.subject || '').toLowerCase())
       );
 
       // De-duplicate when both A and B weeks were searched.
