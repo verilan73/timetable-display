@@ -625,21 +625,21 @@
       background: #e53935;
       border-radius: 50%;
     }
-    /* Current-day column: header-only marker (dark maroon on the <th> only) */
+    /* Current-day column: dark maroon on the header */
     .timetable th.current-day,
     .mf-grid th.current-day   { background: #4a0e2b !important; }
-    /* Current-period row: red wash poured over every coloured card via inset
-       box-shadow — fills the cell without touching layout or the header row */
-    .timetable tr.current-period td.grid-cell {
-      box-shadow: inset 0 0 0 2000px rgba(160, 0, 0, 0.15);
+    /* Current-period cards: desaturate + darken via filter so the row reads
+       as "in progress" without removing the subject colour coding entirely */
+    .timetable tr.current-period td.grid-cell .slot {
+      filter: brightness(0.80) sepia(0.45);
     }
-    /* Current period × current day: stronger tint marks "right now" exactly */
-    .timetable tr.current-period td.grid-cell.current-day {
-      box-shadow: inset 0 0 0 2000px rgba(160, 0, 0, 0.30);
-    }
-    /* Period label cell (light background): slim red top border instead of tint */
+    /* Period label: match the dark maroon treatment of the column heading */
     .timetable tr.current-period td.period-label {
-      border-top: 3px solid rgba(229, 57, 53, 0.65);
+      background: #4a0e2b;
+    }
+    .timetable tr.current-period td.period-label .period-name,
+    .timetable tr.current-period td.period-label .period-time {
+      color: #e8eaf6;
     }
     /* Meeting finder equivalents */
     .mf-grid tr.current-period td { border-top: 2px solid #e53935; }
