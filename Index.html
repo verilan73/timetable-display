@@ -632,9 +632,9 @@
        break) are still visibly marked even though they have no card slots */
     .timetable tr.current-period td.grid-cell        { background: rgba(74,14,43,.06); }
     .timetable tr.current-period td.grid-cell.current-day { background: rgba(74,14,43,.11); }
-    /* Cards in teaching periods get the stronger filter treatment on top */
+    /* Cards in the current period: clearly dark and warm-toned */
     .timetable tr.current-period td.grid-cell .slot {
-      filter: brightness(0.80) sepia(0.45);
+      filter: brightness(0.68) sepia(0.70);
     }
     /* Period label: match the dark maroon treatment of the column heading */
     .timetable tr.current-period td.period-label {
