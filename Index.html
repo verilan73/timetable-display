@@ -628,8 +628,11 @@
     /* Current-day column: dark maroon on the header */
     .timetable th.current-day,
     .mf-grid th.current-day   { background: #4a0e2b !important; }
-    /* Current-period cards: desaturate + darken via filter so the row reads
-       as "in progress" without removing the subject colour coding entirely */
+    /* Current-period: all cells get a base tint so empty periods (lunch,
+       break) are still visibly marked even though they have no card slots */
+    .timetable tr.current-period td.grid-cell        { background: rgba(74,14,43,.06); }
+    .timetable tr.current-period td.grid-cell.current-day { background: rgba(74,14,43,.11); }
+    /* Cards in teaching periods get the stronger filter treatment on top */
     .timetable tr.current-period td.grid-cell .slot {
       filter: brightness(0.80) sepia(0.45);
     }
@@ -2358,7 +2361,6 @@
           const tr = document.createElement('tr');
           if (isNonTeaching(period.label)) tr.classList.add('non-teaching');
           const periodIsNow = showNow &&
-            !isNonTeaching(period.label) &&
             nowMin >= period.startMin && nowMin < period.endMin;
           if (periodIsNow) tr.classList.add('current-period');
 
