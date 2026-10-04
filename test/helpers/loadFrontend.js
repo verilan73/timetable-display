@@ -38,13 +38,16 @@ function loadFrontend() {
   });
 
   const context = {
-    window: {},
+    // Index.html builds its localStorage keys from location.pathname at load time.
+    window: { location: { pathname: '/test', search: '' } },
     document: {
       getElementById: fakeElement,
       querySelectorAll: () => [],
       createElement: fakeElement,
     },
     google: undefined,
+    // The current-time indicator starts a refresh timer at load; tests don't need it to fire.
+    setInterval: () => 0,
   };
   vm.createContext(context);
   vm.runInContext(code, context, { filename: 'Index.html script' });
