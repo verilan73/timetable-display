@@ -58,7 +58,17 @@ function getConfig() {
 function getClientConfig() {
   const { logoUrl, logoAlt } = getConfig();
   const weekInfo = getCurrentWeekInfo();
-  return { logoUrl, logoAlt, currentWeek: weekInfo.week };
+  const props = PropertiesService.getScriptProperties();
+  // Parse building exclusion defaults — comma-separated, trimmed, blanks removed.
+  const parseBldg = key => (props.getProperty(key) || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  return {
+    logoUrl,
+    logoAlt,
+    currentWeek:     weekInfo.week,
+    raExclMsssBldg:  parseBldg('RA_EXCL_MSSS_BUILDINGS'),
+    raExclJsBldg:    parseBldg('RA_EXCL_JS_BUILDINGS'),
+  };
 }
 
 /**
@@ -125,6 +135,10 @@ function setupConfig() {
     LOGO_URL:             '',
     LOGO_ALT:             'School logo',
     WEEK_CALENDAR_NAME:   '',   // name of the Google Calendar whose Monday events identify the A/B week
+    // Comma-separated building names hidden by default in the "Rooms free?" view.
+    // Update these each year in Project Settings → Script Properties if building names change.
+    RA_EXCL_MSSS_BUILDINGS: 'Duty Areas,Meetings',
+    RA_EXCL_JS_BUILDINGS:   'Meeting,SwimSkate',
   };
   Object.entries(defaults).forEach(([k, v]) => {
     if (!props.getProperty(k)) props.setProperty(k, v);
@@ -1146,6 +1160,11 @@ function buildRoomData(msssFile, jsFile) {
   const msss = parseScheduleSource(msssDoc);
   const js   = parseScheduleSource(jsDoc);
 
+  // Parse the <buildings> section from each XML so we can join building name
+  // onto each room — the frontend uses this for the "Rooms free?" building filter.
+  const msssBldgs = parseSection(msssDoc.getRootElement(), 'buildings', 'building');
+  const jsBldgs   = parseSection(jsDoc.getRootElement(),   'buildings', 'building');
+
   const rooms = [];
   const schedules = {};
 
@@ -1153,13 +1172,17 @@ function buildRoomData(msssFile, jsFile) {
   // renderEntityTimeline() on the frontend reads sched.msss/sched.js uniformly
   // across all three entity types.
   Object.entries(msss.classrooms).forEach(([id, r]) => {
-    const key = `m:${id}`;
-    rooms.push({ name: r.name, short: r.short, source: 'ms', scheduleKey: key });
+    const key  = `m:${id}`;
+    const bldg = msssBldgs[r.buildingid] || {};
+    rooms.push({ name: r.name, short: r.short, source: 'ms', scheduleKey: key,
+                 buildingName: bldg.name || '' });
     schedules[key] = { msss: buildRoomSchedule(id, msss), js: null };
   });
   Object.entries(js.classrooms).forEach(([id, r]) => {
-    const key = `j:${id}`;
-    rooms.push({ name: r.name, short: r.short, source: 'js', scheduleKey: key });
+    const key  = `j:${id}`;
+    const bldg = jsBldgs[r.buildingid] || {};
+    rooms.push({ name: r.name, short: r.short, source: 'js', scheduleKey: key,
+                 buildingName: bldg.name || '' });
     schedules[key] = { msss: null, js: buildRoomSchedule(id, js) };
   });
 

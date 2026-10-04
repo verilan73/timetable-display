@@ -632,8 +632,11 @@
        break) are still visibly marked even though they have no card slots */
     .timetable tr.current-period td.grid-cell        { background: rgba(74,14,43,.06); }
     .timetable tr.current-period td.grid-cell.current-day { background: rgba(74,14,43,.11); }
-    /* Cards in the current period: clearly dark and warm-toned */
+    /* Cards in the current period: gentle tint on all days, strong on today */
     .timetable tr.current-period td.grid-cell .slot {
+      filter: brightness(0.88) sepia(0.30);
+    }
+    .timetable tr.current-period td.grid-cell.current-day .slot {
       filter: brightness(0.68) sepia(0.70);
     }
     /* Period label: match the dark maroon treatment of the column heading */
@@ -857,6 +860,58 @@
       padding: 56px 16px;
       font-size: 14px;
     }
+
+    /* ── Room availability view ───────────────────────────────────────────── */
+    .ra-section { margin: 14px 0 6px; }
+    .ra-section-heading {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: #888; margin-bottom: 8px;
+    }
+    .ra-free-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .ra-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 11px; border-radius: 12px;
+      background: #c8e6c9; color: #1b5e20;
+      font-size: 12.5px; font-weight: 600;
+      border: 1px solid #a5d6a7;
+      white-space: nowrap;
+    }
+    .ra-chip-x {
+      font-size: 11px; line-height: 1; opacity: .45; cursor: pointer;
+      background: none; border: none; color: inherit; padding: 0;
+    }
+    .ra-chip-x:hover { opacity: 1; }
+    /* Building filter bar */
+    .ra-bldg-filter {
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 6px; margin: 10px 0 6px;
+    }
+    .ra-filter-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .07em; color: #888; white-space: nowrap; margin-right: 2px;
+    }
+    .ra-bldg-btn {
+      padding: 3px 10px; border-radius: 10px; border: 1.5px solid #4caf50;
+      background: #e8f5e9; color: #2e7d32; font-size: 12px; cursor: pointer; line-height: 1.4;
+    }
+    .ra-bldg-btn.excluded {
+      border-color: #ddd; background: #f5f5f5; color: #aaa; text-decoration: line-through;
+    }
+    .ra-reset-btn {
+      margin-left: auto; font-size: 11.5px; color: #c62828;
+      background: none; border: none; cursor: pointer; text-decoration: underline; padding: 2px 4px;
+    }
+    @media (prefers-color-scheme: dark) {
+      .ra-bldg-btn          { border-color: #388e3c; background: #1b3a1c; color: #81c784; }
+      .ra-bldg-btn.excluded { border-color: #444; background: #2a2a2a; color: #666; }
+      .ra-reset-btn         { color: #ef9a9a; }
+    }
+    :root[data-theme="dark"] .ra-bldg-btn          { border-color: #388e3c; background: #1b3a1c; color: #81c784; }
+    :root[data-theme="dark"] .ra-bldg-btn.excluded { border-color: #444; background: #2a2a2a; color: #666; }
+    :root[data-theme="dark"] .ra-reset-btn         { color: #ef9a9a; }
+    :root[data-theme="light"] .ra-bldg-btn          { border-color: #4caf50; background: #e8f5e9; color: #2e7d32; }
+    :root[data-theme="light"] .ra-bldg-btn.excluded { border-color: #ddd; background: #f5f5f5; color: #aaa; }
+    :root[data-theme="light"] .ra-reset-btn         { color: #c62828; }
   </style>
 </head>
 <body>
@@ -878,6 +933,7 @@
           <button id="btn-view-rooms"                   onclick="setView('rooms')">Rooms</button>
           <button id="btn-view-meeting"                  onclick="setView('meeting')">Find a common time</button>
           <button id="btn-view-who"                      onclick="setView('who')">Who is teaching?</button>
+          <button id="btn-view-roomavail"               onclick="setView('roomavail')">Rooms free?</button>
         </div>
       </div>
       <!-- Class-mode controls: school selector + group/class dropdown.
@@ -1022,6 +1078,37 @@
           </div>
         </div>
       </div>
+      <!-- Room-availability controls: division + period + day, hidden by default -->
+      <div id="room-avail-controls" style="display:none">
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Division</label>
+          <div class="toggle">
+            <button id="btn-ra-js"                  onclick="setRoomAvailDivision('JS')">JS</button>
+            <button id="btn-ra-ms" class="active"   onclick="setRoomAvailDivision('MS')">MS</button>
+            <button id="btn-ra-ss"                  onclick="setRoomAvailDivision('SS')">SS</button>
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Period</label>
+          <div id="ra-period-toggle" class="toggle">
+            <!-- populated dynamically by buildRoomAvailPeriodPicker() -->
+          </div>
+        </div>
+        <div class="controls-divider"></div>
+        <div class="control-group">
+          <label>Day</label>
+          <div class="toggle">
+            <button id="btn-ra-today" class="active" onclick="setRoomAvailDay(null)">Today</button>
+            <button id="btn-ra-mon"                  onclick="setRoomAvailDay(1)">Mon</button>
+            <button id="btn-ra-tue"                  onclick="setRoomAvailDay(2)">Tue</button>
+            <button id="btn-ra-wed"                  onclick="setRoomAvailDay(3)">Wed</button>
+            <button id="btn-ra-thu"                  onclick="setRoomAvailDay(4)">Thu</button>
+            <button id="btn-ra-fri"                  onclick="setRoomAvailDay(5)">Fri</button>
+          </div>
+        </div>
+      </div>
       <!-- Semester toggle — always visible -->
       <div class="control-group">
         <label>Semester</label>
@@ -1087,6 +1174,17 @@
     let allLessons           = [];   // flat list built from teacherData at load time
 
     let startupView = null;          // set from URL params, consumed once on first render
+
+    let roomAvailDiv       = 'MS';   // 'JS' | 'MS' | 'SS'
+    let roomAvailPeriodIdx = null;   // null = Now
+    let roomAvailDayCol    = null;   // null = Today
+    // Per-division exclusion sets for "Rooms free?" view — kept separate so
+    // MS/SS defaults don't bleed into JS and vice versa when switching divisions.
+    let raExclusions = {
+      msss: { bldg: new Set(), room: new Set() },
+      js:   { bldg: new Set(), room: new Set() }
+    };
+    let raDefaultExcl = { msss: [], js: [] }; // seeded from Script Properties via clientConfig
 
     /** Returns the 1-indexed weekday column (1=Mon … 5=Fri), or null on weekends. */
     function getTodayCol() {
@@ -1182,33 +1280,56 @@
     /**
      * Reads view state from URL query params and seeds the matching JS state
      * variables and button active classes before any render.  Returns the
-     * requested view name (defaulting to 'classes' if absent or unrecognised),
-     * which init() stores in startupView for onDataLoaded to consume.
+     * startup view name to route to on first load.
      *
-     * Supported params:
-     *   view   — 'classes' | 'teachers' | 'subjects' | 'rooms' | 'meeting' | 'who'
-     *   sem    — 'S1' | 'S2'
-     *   school — 'MSSS' | 'JS'   (classes view only)
-     *   div    — 'JS' | 'MS' | 'SS'  (who-is-teaching view only)
+     * Reads from localStorage (keyed per deployment URL) so each user's last
+     * view, semester, school, and division are restored automatically — without
+     * depending on URL query params, which Apps Script strips after auth redirects.
      */
-    function readUrlParams() {
-      const p = new URLSearchParams(window.location.search);
 
-      const sem = p.get('sem');
+    /** localStorage key scoped to this deployment so other Apps Script apps don't collide. */
+    const PREFS_KEY      = 'tt-prefs:' + window.location.pathname;
+    const RA_FILTER_KEY  = 'tt-ra-filt:' + window.location.pathname;
+
+    /** Persist current view state so it survives page reloads and new sessions. */
+    function savePrefs() {
+      try {
+        localStorage.setItem(PREFS_KEY, JSON.stringify({
+          view:       currentView,
+          sem:        currentSem,
+          school:     currentSchedule,
+          whoDiv:     whoTeachingDivision,
+          roomAvDiv:  roomAvailDiv
+        }));
+      } catch(e) { /* ignore if localStorage unavailable */ }
+    }
+
+    /**
+     * Reads stored prefs and seeds state variables + button active classes.
+     * Returns the startup view name (defaulting to 'classes').
+     */
+    function applyStoredPrefs() {
+      let prefs = {};
+      try {
+        const raw = localStorage.getItem(PREFS_KEY);
+        if (raw) prefs = JSON.parse(raw);
+      } catch(e) {}
+
+      const sem = prefs.sem;
       if (sem === 'S1' || sem === 'S2') {
         currentSem = sem;
         document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
         document.getElementById('btn-s2').classList.toggle('active', sem === 'S2');
       }
 
-      const school = p.get('school');
+      const school = prefs.school;
       if (school === 'MSSS' || school === 'JS') {
         currentSchedule = school;
         document.getElementById('btn-msss').classList.toggle('active', school === 'MSSS');
         document.getElementById('btn-js').classList.toggle('active',   school === 'JS');
       }
 
-      const div = p.get('div');
+      const div = prefs.whoDiv;
       if (['JS','MS','SS'].includes(div)) {
         whoTeachingDivision = div;
         ['JS','MS','SS'].forEach(d =>
@@ -1217,23 +1338,80 @@
         );
       }
 
-      const view = p.get('view');
-      const VALID = new Set(['classes','teachers','subjects','rooms','meeting','who']);
-      return VALID.has(view) ? view : 'classes';
+      const raDiv = prefs.roomAvDiv;
+      if (['JS','MS','SS'].includes(raDiv)) {
+        roomAvailDiv = raDiv;
+        ['JS','MS','SS'].forEach(d =>
+          document.getElementById(`btn-ra-${d.toLowerCase()}`)
+            ?.classList.toggle('active', d === raDiv)
+        );
+      }
+
+      const VALID = new Set(['classes','teachers','subjects','rooms','meeting','who','roomavail']);
+      return VALID.has(prefs.view) ? prefs.view : 'classes';
+    }
+
+    /** Returns the exclusion sets for the currently selected division. */
+    function raExcl() {
+      return raExclusions[roomAvailDiv === 'JS' ? 'js' : 'msss'];
+    }
+
+    /** Persists per-division exclusion lists to localStorage. */
+    function saveRaFilters() {
+      try {
+        localStorage.setItem(RA_FILTER_KEY, JSON.stringify({
+          msss: { bldg: [...raExclusions.msss.bldg], room: [...raExclusions.msss.room] },
+          js:   { bldg: [...raExclusions.js.bldg],   room: [...raExclusions.js.room] }
+        }));
+      } catch(e) {}
     }
 
     /**
-     * Writes the current view state back to the URL as query params using
-     * replaceState (no history entry).  Called after every user-initiated
-     * state change so the address bar stays bookmarkable.
+     * Restores per-division exclusion lists from localStorage.
+     * Returns true if user prefs were found, false if this is a first visit
+     * (caller should then apply the Script Properties defaults).
      */
-    function updateUrl() {
-      const params = new URLSearchParams();
-      params.set('view', currentView);
-      params.set('sem',  currentSem);
-      if (currentView === 'classes') params.set('school', currentSchedule);
-      if (currentView === 'who')     params.set('div',    whoTeachingDivision);
-      history.replaceState(null, '', window.location.pathname + '?' + params.toString());
+    function loadRaFilters() {
+      try {
+        const raw = localStorage.getItem(RA_FILTER_KEY);
+        if (!raw) return false;
+        const d = JSON.parse(raw);
+        if (d.msss) {
+          raExclusions.msss.bldg = new Set(Array.isArray(d.msss.bldg) ? d.msss.bldg : []);
+          raExclusions.msss.room = new Set(Array.isArray(d.msss.room) ? d.msss.room : []);
+        }
+        if (d.js) {
+          raExclusions.js.bldg = new Set(Array.isArray(d.js.bldg) ? d.js.bldg : []);
+          raExclusions.js.room = new Set(Array.isArray(d.js.room) ? d.js.room : []);
+        }
+        return true;
+      } catch(e) {}
+      return false;
+    }
+
+    /** Toggles one building in/out of the current division's exclusion list. */
+    function toggleRaBuilding(name) {
+      const e = raExcl();
+      if (e.bldg.has(name)) e.bldg.delete(name); else e.bldg.add(name);
+      saveRaFilters();
+      renderRoomAvailability();
+    }
+
+    /** Toggles one room short-name in/out of the current division's exclusion list. */
+    function toggleRaRoom(short) {
+      const e = raExcl();
+      if (e.room.has(short)) e.room.delete(short); else e.room.add(short);
+      saveRaFilters();
+      renderRoomAvailability();
+    }
+
+    /** Resets the current division's exclusions back to the Script Properties defaults. */
+    function resetRaFilters() {
+      const key = roomAvailDiv === 'JS' ? 'js' : 'msss';
+      raExclusions[key].bldg = new Set(raDefaultExcl[key]);
+      raExclusions[key].room.clear();
+      saveRaFilters();
+      renderRoomAvailability();
     }
 
     /**
@@ -1245,9 +1423,10 @@
         onError({ message: 'Not running inside Apps Script.' });
         return;
       }
-      // Read URL params before any data loads so state variables and button
-      // classes are correct when the first render fires inside onDataLoaded.
-      startupView = readUrlParams();
+      // Restore last-used view/sem/school/div from localStorage so the app
+      // opens where the user left it, without depending on URL params.
+      startupView = applyStoredPrefs();
+      const raHasUserPrefs = loadRaFilters();
       try {
         const [msss, js, teachers, subjects, rooms, clientConfig] = await Promise.all([
           gsRun('getTimetableData', 'MSSS'),
@@ -1265,6 +1444,17 @@
         }
         // currentWeek is 'A', 'B', or null (holiday/unconfigured).
         if (clientConfig) currentWeek = clientConfig.currentWeek || null;
+        // Seed "Rooms free?" defaults from Script Properties. Applied on first visit only
+        // (raHasUserPrefs = false); on subsequent visits, localStorage takes precedence.
+        if (clientConfig) {
+          raDefaultExcl.msss = clientConfig.raExclMsssBldg || [];
+          raDefaultExcl.js   = clientConfig.raExclJsBldg   || [];
+          if (!raHasUserPrefs) {
+            raExclusions.msss.bldg = new Set(raDefaultExcl.msss);
+            raExclusions.js.bldg   = new Set(raDefaultExcl.js);
+            saveRaFilters();
+          }
+        }
         allData.MSSS = msss;
         allData.JS   = js;
         onTeacherDataLoaded(teachers);
@@ -1284,7 +1474,7 @@
       document.getElementById('btn-js').classList.toggle('active',   schedule === 'JS');
       currentTg = null;
       activeFilters.clear();
-      updateUrl();
+      savePrefs();
       onDataLoaded(allData[schedule]);
     }
 
@@ -1976,12 +2166,15 @@
       return lessons;
     }
 
-    /** Returns the teaching periods for the currently-selected division, excluding breaks. */
-    function getWhoPeriods() {
+    /**
+     * Returns the teaching periods for a division, excluding breaks/lunch.
+     * Accepts an optional div parameter; defaults to whoTeachingDivision so
+     * callers that don't pass a div still work as before.
+     */
+    function getWhoPeriods(div) {
       if (!teacherData) return [];
-      const src = whoTeachingDivision === 'JS'
-        ? teacherData.jsPeriods
-        : teacherData.msssPeriods;
+      const d = div !== undefined ? div : whoTeachingDivision;
+      const src = d === 'JS' ? teacherData.jsPeriods : teacherData.msssPeriods;
       return (src || []).filter(p => !isExcludedFromPicker(p.label));
     }
 
@@ -2017,7 +2210,7 @@
         document.getElementById(`btn-who-${d.toLowerCase()}`)
           ?.classList.toggle('active', d === div)
       );
-      updateUrl();
+      savePrefs();
       buildWhoPeriodPicker();
       renderWhoIsTeaching();
     }
@@ -2195,34 +2388,289 @@
       });
     }
 
+    // ── Room availability ─────────────────────────────────────────────────────
+
+    /** Rebuilds the period-picker button row for the "Rooms free?" view. */
+    function buildRoomAvailPeriodPicker() {
+      const toggle = document.getElementById('ra-period-toggle');
+      if (!toggle) return;
+      toggle.innerHTML = '';
+
+      const nowBtn = document.createElement('button');
+      nowBtn.id = 'btn-ra-now';
+      nowBtn.textContent = 'Now';
+      nowBtn.onclick = () => setRoomAvailPeriod(null);
+      if (roomAvailPeriodIdx === null) nowBtn.classList.add('active');
+      toggle.appendChild(nowBtn);
+
+      getWhoPeriods(roomAvailDiv).forEach((period, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = period.label;
+        btn.onclick = () => setRoomAvailPeriod(i);
+        if (roomAvailPeriodIdx === i) btn.classList.add('active');
+        toggle.appendChild(btn);
+      });
+    }
+
+    function setRoomAvailDivision(div) {
+      roomAvailDiv       = div;
+      roomAvailPeriodIdx = null;
+      ['JS','MS','SS'].forEach(d =>
+        document.getElementById(`btn-ra-${d.toLowerCase()}`)
+          ?.classList.toggle('active', d === div)
+      );
+      savePrefs();
+      buildRoomAvailPeriodPicker();
+      renderRoomAvailability();
+    }
+
+    function setRoomAvailDay(col) {
+      roomAvailDayCol = col;
+      const pairs = [[null,'today'],[1,'mon'],[2,'tue'],[3,'wed'],[4,'thu'],[5,'fri']];
+      pairs.forEach(([v, suffix]) =>
+        document.getElementById(`btn-ra-${suffix}`)
+          ?.classList.toggle('active', col === v)
+      );
+      renderRoomAvailability();
+    }
+
+    function setRoomAvailPeriod(idx) {
+      roomAvailPeriodIdx = idx;
+      buildRoomAvailPeriodPicker();
+      renderRoomAvailability();
+    }
+
+    /**
+     * Renders the "Rooms free?" view into #grids.
+     * Cross-references active lessons (from allLessons) against the full room
+     * roster (from roomData) for the selected division/period/day to produce
+     * a free-room chip list and an in-use room table.
+     */
+    function renderRoomAvailability() {
+      const gridsEl = document.getElementById('grids');
+      gridsEl.innerHTML = '';
+
+      if (!teacherData || !roomData || allLessons.length === 0) {
+        gridsEl.innerHTML = '<p class="wit-placeholder">Loading data…</p>';
+        return;
+      }
+
+      const dayCol = roomAvailDayCol === null ? getTodayCol() : roomAvailDayCol;
+      if (dayCol === null) {
+        gridsEl.innerHTML = '<p class="wit-placeholder">No school today — select a weekday above to look ahead.</p>';
+        return;
+      }
+
+      const periods = getWhoPeriods(roomAvailDiv);
+      const nowMin  = getCurrentMin();
+      let period;
+      if (roomAvailPeriodIdx === null) {
+        period = periods.find(p => nowMin >= p.startMin && nowMin < p.endMin) || null;
+      } else {
+        period = periods[roomAvailPeriodIdx] || null;
+      }
+
+      if (!period) {
+        const msg = roomAvailPeriodIdx === null
+          ? 'No lesson in progress right now — select a period above to look ahead.'
+          : 'Period data not available.';
+        gridsEl.innerHTML = `<p class="wit-placeholder">${msg}</p>`;
+        return;
+      }
+
+      const sem         = currentSem;
+      const isJsDiv     = roomAvailDiv === 'JS';
+      // Lessons come from one source file; rooms are labelled 'js' or 'ms' in roomData.
+      const lessonSrc   = isJsDiv ? 'js'   : 'msss';
+      const roomSrc     = isJsDiv ? 'js'   : 'ms';
+      const targetWeeks = isJsDiv ? ['single'] : (currentWeek ? [currentWeek] : ['A','B']);
+
+      // Collect all lessons occupying any room during this period.
+      let activeLessons = allLessons.filter(l =>
+        l.sem    === sem              &&
+        l.source === lessonSrc        &&
+        targetWeeks.includes(l.week)  &&
+        l.day    === dayCol           &&
+        l.startMin < period.endMin    &&
+        l.endMin   > period.startMin
+      );
+
+      // De-duplicate when both A and B weeks were searched.
+      if (targetWeeks.length > 1) {
+        const seen = new Set();
+        activeLessons = activeLessons.filter(l => {
+          const key = `${l.teacher.scheduleKey}|${l.startMin}|${l.classNames}|${l.roomShort}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+
+      // Build map: room.short → lesson[].
+      // roomShort can be comma-separated when a lesson spans multiple rooms.
+      const occupiedMap = new Map();
+      activeLessons.forEach(l => {
+        if (!l.roomShort) return;
+        l.roomShort.split(',').map(s => s.trim()).filter(Boolean).forEach(rs => {
+          if (!occupiedMap.has(rs)) occupiedMap.set(rs, []);
+          occupiedMap.get(rs).push(l);
+        });
+      });
+
+      // All rooms for this division, sorted by name (before any exclusion filtering).
+      const divRooms = (roomData.rooms || [])
+        .filter(r => r.source === roomSrc)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // Unique building names for this division (for the filter bar).
+      const allBuildings = [...new Set(divRooms.map(r => r.buildingName).filter(Boolean))].sort();
+
+      // Apply building and room exclusions for the current division.
+      const excl = raExcl();
+      const hiddenCount = divRooms.filter(r =>
+        excl.bldg.has(r.buildingName) || excl.room.has(r.short)
+      ).length;
+      const visibleRooms = divRooms.filter(r =>
+        !excl.bldg.has(r.buildingName) && !excl.room.has(r.short)
+      );
+      const freeRooms = visibleRooms.filter(r => !occupiedMap.has(r.short));
+      const busyRooms = visibleRooms.filter(r =>  occupiedMap.has(r.short));
+
+      const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri'];
+      const dayLabel   = DAY_LABELS[dayCol - 1];
+      const divLabel   = { JS: 'Junior School', MS: 'Middle School', SS: 'Senior School' }[roomAvailDiv];
+      const weekNote   = targetWeeks.length > 1
+        ? ' · <em>week unknown — A &amp; B combined</em>' : '';
+      const hiddenNote = hiddenCount > 0
+        ? ` · <span style="opacity:.6">${hiddenCount} hidden by filter</span>` : '';
+
+      // Banner.
+      const banner = document.createElement('div');
+      banner.className = 'wit-banner';
+      banner.innerHTML = `
+        <strong>${freeRooms.length} room${freeRooms.length !== 1 ? 's' : ''} free</strong>
+        <span class="wit-banner-detail">${divLabel} · ${period.label} · ${dayLabel} · ${busyRooms.length} in use${weekNote}${hiddenNote}</span>`;
+      gridsEl.appendChild(banner);
+
+      // Building filter bar — one toggle per building, shown whenever there are buildings.
+      if (allBuildings.length > 0) {
+        const bar = document.createElement('div');
+        bar.className = 'ra-bldg-filter';
+        const lbl = document.createElement('span');
+        lbl.className = 'ra-filter-label';
+        lbl.textContent = 'Buildings:';
+        bar.appendChild(lbl);
+        allBuildings.forEach(bldg => {
+          const btn = document.createElement('button');
+          btn.className = 'ra-bldg-btn' + (excl.bldg.has(bldg) ? ' excluded' : '');
+          btn.textContent = bldg;
+          btn.title = excl.bldg.has(bldg) ? 'Click to include' : 'Click to hide';
+          btn.addEventListener('click', () => toggleRaBuilding(bldg));
+          bar.appendChild(btn);
+        });
+        const rst = document.createElement('button');
+        rst.className = 'ra-reset-btn';
+        rst.textContent = 'Reset to defaults';
+        rst.addEventListener('click', resetRaFilters);
+        bar.appendChild(rst);
+        gridsEl.appendChild(bar);
+      }
+
+      // Free rooms — chip badges; each chip has a × to hide that room.
+      if (freeRooms.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'ra-section';
+        const heading = document.createElement('div');
+        heading.className = 'ra-section-heading';
+        heading.textContent = `Free (${freeRooms.length})`;
+        section.appendChild(heading);
+        const chips = document.createElement('div');
+        chips.className = 'ra-free-chips';
+        freeRooms.forEach(r => {
+          const chip = document.createElement('span');
+          chip.className = 'ra-chip';
+          chip.appendChild(document.createTextNode(r.name));
+          const x = document.createElement('button');
+          x.className = 'ra-chip-x';
+          x.textContent = '×';
+          x.title = `Hide ${r.name}`;
+          x.addEventListener('click', () => toggleRaRoom(r.short));
+          chip.appendChild(x);
+          chips.appendChild(chip);
+        });
+        section.appendChild(chips);
+        gridsEl.appendChild(section);
+      }
+
+      // In-use rooms — sortable table (one row per lesson; rare conflicts show as multiple rows).
+      if (busyRooms.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'ra-section';
+        const heading = document.createElement('div');
+        heading.className = 'ra-section-heading';
+        heading.textContent = `In use (${busyRooms.length})`;
+        section.appendChild(heading);
+
+        const table = document.createElement('table');
+        table.className = 'wit-table';
+
+        const thead = table.createTHead();
+        const hr = thead.insertRow();
+        ['Room', 'Subject', 'Class', 'Teacher'].forEach((label, colIdx) => {
+          const th = document.createElement('th');
+          th.innerHTML = `${label} <span class="wit-sort-arrow">⇅</span>`;
+          th.style.cursor = 'pointer';
+          th.addEventListener('click', () => sortWitTable(table, colIdx));
+          hr.appendChild(th);
+        });
+
+        const tbody = table.createTBody();
+        busyRooms.forEach(r => {
+          (occupiedMap.get(r.short) || []).forEach(l => {
+            const tr = tbody.insertRow();
+            tr.style.borderLeftColor = subjectColour(l.subjectShort);
+            [r.name, l.subject, l.classNames, l.teacher.name].forEach(text => {
+              tr.insertCell().textContent = text;
+            });
+          });
+        });
+
+        section.appendChild(table);
+        gridsEl.appendChild(section);
+      }
+    }
+
     // ── View toggle ───────────────────────────────────────────────────────────
     function setView(view) {
       currentView = view;
-      updateUrl();
+      savePrefs();
       document.getElementById('btn-view-classes').classList.toggle('active',  view === 'classes');
       document.getElementById('btn-view-teachers').classList.toggle('active', view === 'teachers');
       document.getElementById('btn-view-subjects').classList.toggle('active', view === 'subjects');
       document.getElementById('btn-view-rooms').classList.toggle('active',    view === 'rooms');
       document.getElementById('btn-view-meeting').classList.toggle('active',  view === 'meeting');
-      document.getElementById('btn-view-who').classList.toggle('active',      view === 'who');
-      document.getElementById('class-controls').style.display   = view === 'classes'  ? 'contents' : 'none';
-      document.getElementById('teacher-controls').style.display = view === 'teachers' ? 'contents' : 'none';
-      document.getElementById('subject-controls').style.display = view === 'subjects' ? 'contents' : 'none';
-      document.getElementById('room-controls').style.display    = view === 'rooms'    ? 'contents' : 'none';
-      document.getElementById('meeting-controls').style.display = view === 'meeting'  ? 'contents' : 'none';
-      document.getElementById('who-controls').style.display     = view === 'who'      ? 'contents' : 'none';
+      document.getElementById('btn-view-who').classList.toggle('active',         view === 'who');
+      document.getElementById('btn-view-roomavail').classList.toggle('active',  view === 'roomavail');
+      document.getElementById('class-controls').style.display      = view === 'classes'    ? 'contents' : 'none';
+      document.getElementById('teacher-controls').style.display    = view === 'teachers'   ? 'contents' : 'none';
+      document.getElementById('subject-controls').style.display    = view === 'subjects'   ? 'contents' : 'none';
+      document.getElementById('room-controls').style.display       = view === 'rooms'      ? 'contents' : 'none';
+      document.getElementById('meeting-controls').style.display    = view === 'meeting'    ? 'contents' : 'none';
+      document.getElementById('who-controls').style.display        = view === 'who'        ? 'contents' : 'none';
+      document.getElementById('room-avail-controls').style.display = view === 'roomavail'  ? 'contents' : 'none';
       // The subject-highlight legend only makes sense in Classes view, where
       // several subjects are visible at once — the other views already scope
       // to one selected entity.
       document.getElementById('legend').style.display = view === 'classes' ? '' : 'none';
       activeFilters.clear();
 
-      if (view === 'teachers')      renderTeacherTimeline();
-      else if (view === 'subjects') renderSubjectTimeline();
-      else if (view === 'rooms')    renderRoomTimeline();
-      else if (view === 'meeting')  renderMeetingFinder();
-      else if (view === 'who')      { buildWhoPeriodPicker(); renderWhoIsTeaching(); }
-      else                          renderGrid();
+      if (view === 'teachers')       renderTeacherTimeline();
+      else if (view === 'subjects')  renderSubjectTimeline();
+      else if (view === 'rooms')     renderRoomTimeline();
+      else if (view === 'meeting')   renderMeetingFinder();
+      else if (view === 'who')       { buildWhoPeriodPicker(); renderWhoIsTeaching(); }
+      else if (view === 'roomavail') { buildRoomAvailPeriodPicker(); renderRoomAvailability(); }
+      else                           renderGrid();
     }
 
     // ── Semester toggle ───────────────────────────────────────────────────────
@@ -2230,14 +2678,15 @@
       currentSem = sem;
       document.getElementById('btn-s1').classList.toggle('active', sem === 'S1');
       document.getElementById('btn-s2').classList.toggle('active', sem === 'S2');
-      updateUrl();
+      savePrefs();
 
-      if (currentView === 'teachers')      renderTeacherTimeline();
-      else if (currentView === 'subjects') renderSubjectTimeline();
-      else if (currentView === 'rooms')    renderRoomTimeline();
-      else if (currentView === 'meeting')  renderMeetingFinder();
-      else if (currentView === 'who')      renderWhoIsTeaching();
-      else                                 renderGrid();
+      if (currentView === 'teachers')        renderTeacherTimeline();
+      else if (currentView === 'subjects')   renderSubjectTimeline();
+      else if (currentView === 'rooms')      renderRoomTimeline();
+      else if (currentView === 'meeting')    renderMeetingFinder();
+      else if (currentView === 'who')        renderWhoIsTeaching();
+      else if (currentView === 'roomavail')  renderRoomAvailability();
+      else                                   renderGrid();
     }
 
     // ── Filter ────────────────────────────────────────────────────────────────
@@ -3230,12 +3679,13 @@
     // as the school day progresses without requiring a full page reload.
     setInterval(() => {
       if (!timetableData && !teacherData) return;
-      if      (currentView === 'teachers') renderTeacherTimeline();
-      else if (currentView === 'subjects') renderSubjectTimeline();
-      else if (currentView === 'rooms')    renderRoomTimeline();
-      else if (currentView === 'meeting')  renderMeetingFinder();
-      else if (currentView === 'who')      renderWhoIsTeaching();
-      else                                 renderGrid();
+      if      (currentView === 'teachers')   renderTeacherTimeline();
+      else if (currentView === 'subjects')   renderSubjectTimeline();
+      else if (currentView === 'rooms')      renderRoomTimeline();
+      else if (currentView === 'meeting')    renderMeetingFinder();
+      else if (currentView === 'who')        renderWhoIsTeaching();
+      else if (currentView === 'roomavail')  renderRoomAvailability();
+      else                                   renderGrid();
     }, 5 * 60 * 1000);
 
     init();
